@@ -1,3 +1,4 @@
+import ast
 import token
 from io import StringIO
 from tokenize import TokenInfo, generate_tokens, untokenize
@@ -33,8 +34,6 @@ def merge_operators(tokens: Iterable[TokenInfo]) -> List[TokenInfo]:
 
 class PipeOperator:
     tokvals = (
-        "",
-        "\n",
         ":=",
         "lambda",
         "if",
@@ -77,6 +76,8 @@ def compile(s: str) -> str:
         toknum, tokval, *_ = tokens[i]
 
         if tokval in ("||>", "|>"):
+            ast.parse(untokenize(tokens[:i]))
+
             left_i = PipeOperator.rfind_split(result)
             right_i = PipeOperator.lfind_split(tokens[i + 1 :])
             if tokval == "||>":
