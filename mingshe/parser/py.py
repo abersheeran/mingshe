@@ -16,8 +16,6 @@ from pyparsing import (
     Optional,
 )
 
-lparen, rparen, lbrack, rbrack, lbrace, rbrace, colon, comma = map(Suppress, "()[]{}:,")
-
 # 定义字面量
 integer_literal = (
     Regex(r"[+-]?0x[\da-f]+").setName("hex-number")
@@ -67,6 +65,16 @@ literals = (
     | dict_literal
 )
 # 定义字面量结束
+
+# 定义符号
+
+lparen, rparen, lbrack, rbrack, lbrace, rbrace, colon, comma, semicolon = map(
+    Suppress, "()[]{}:,;"
+)
+assignment = Suppress("=")
+colon_assignment = Suppress(":=")
+
+# 定义符号结束
 
 identifier = Word(alphas + "_", alphanums + "_")
 
