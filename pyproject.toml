@@ -21,7 +21,7 @@ packages = [
 python = "^3.6"
 
 [tool.poetry.dev-dependencies]
-black = {version = "*", allow-prereleases = true}
+autopep8 = "^1.5.7"
 isort = "*"
 
 flake8 = "*"
@@ -31,8 +31,11 @@ pytest = "^5.4.3"
 [tool.poetry.scripts]
 mingshe = 'mingshe.commands:main'
 
-[tool.isort]
-profile = "black"
+[tool.autopep8]
+in-place = true
+recursive = true
+aggressive = 3
+max_line_length = 120
 
 [build-system]
 build-backend = "poetry.masonry.api"
