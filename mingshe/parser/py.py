@@ -35,7 +35,9 @@ string_literal = Combine(
 
 bytes_literal = Combine(Literal("b") + quotedString.copy())
 
-bool_literal = oneOf("True False", asKeyword=True).setParseAction(lambda tokens: tokens[0] == "True")
+bool_literal = oneOf("True False", asKeyword=True).setParseAction(
+    lambda tokens: tokens[0] == "True"
+)
 
 none_literal = Keyword("None").setParseAction(replaceWith(None))
 
@@ -69,8 +71,18 @@ pipe = Literal("|>")
 questionmark = Literal("?")
 
 pound = Literal("#")
-
-lparen, rparen, lbrack, rbrack, lbrace, rbrace, colon, comma, semicolon = map(Suppress, "()[]{}:,;")
+newline = Literal("\n")
+(
+    lparen,
+    rparen,
+    lbrack,
+    rbrack,
+    lbrace,
+    rbrace,
+    colon,
+    comma,
+    semicolon,
+) = map(Suppress, "()[]{}:,;")
 assignment = Suppress("=")
 colon_assignment = Suppress(":=")
 
@@ -103,21 +115,17 @@ expr = Forward()
 
 func_call = Forward()
 
-expr <<= func_call | literals | identifier
+tuple_literal <<= lparen + Optional(delimitedList(expr)) + Optional(comma) + rparen
 
-tuple_literal <<= lparen + \
-    Optional(delimitedList(expr)) + Optional(comma) + rparen
+list_literal <<= lbrack + Optional(delimitedList(expr) + Optional(comma)) + rbrack
 
-list_literal <<= lbrack + \
-    Optional(delimitedList(expr) + Optional(comma)) + rbrack
-
-set_literal <<= lbrace + \
-    Optional(delimitedList(expr) + Optional(comma)) + rbrace
+set_literal <<= lbrace + Optional(delimitedList(expr) + Optional(comma)) + rbrace
 
 dict_entry = Group(expr + colon + expr)
-dict_literal <<= lbrace + \
-    Optional(delimitedList(dict_entry) + Optional(comma)) + rbrace
+dict_literal <<= lbrace + Optional(delimitedList(dict_entry) + Optional(comma)) + rbrace
 
-func_call << identifier + lparen + \
-    delimitedList(Group(expr | (identifier + "=" + expr))) + \
-    Optional(comma) + rparen
+func_call << identifier + lparen + delimitedList(
+    Group(expr | (identifier + "=" + expr))
+) + Optional(comma) + rparen
+
+expr <<= (func_call | literals | identifier) + Optional(semicolon)

@@ -79,7 +79,7 @@ def compile(s: str) -> str:
             ast.parse(untokenize(tokens[:i]))
 
             left_i = PipeOperator.rfind_split(result)
-            right_i = PipeOperator.lfind_split(tokens[i + 1 :])
+            right_i = PipeOperator.lfind_split(tokens[i + 1:])
             if tokval == "||>":
                 left_expression = result[left_i:]
                 if len(left_expression) <= 1 or left_expression[0][1] in (
@@ -99,7 +99,7 @@ def compile(s: str) -> str:
                 left_expression = result[left_i:]
             right_expression = [
                 (toknum, tokval)
-                for toknum, tokval, *_ in tokens[i + 1 : i + 1 + right_i]
+                for toknum, tokval, *_ in tokens[i + 1: i + 1 + right_i]
             ]
             expression = []
             if len(right_expression) <= 1 or right_expression[0][1] == "(":
