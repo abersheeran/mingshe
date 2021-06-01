@@ -19,6 +19,8 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.6"
+parso = "^0.8.2"
+astunparse = "^1.6.3"
 
 [tool.poetry.dev-dependencies]
 black = {version = "*", allow-prereleases = true}
