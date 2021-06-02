@@ -14,8 +14,8 @@ import mingshe.core
             "print(1)",
         ),
         (
-            "(1, 11) ||> range",
-            "range(*(1, 11))",
+            "(1, 11) |> range(*)",
+            "range((1, 11))",
         ),
         (
             "[1] |> max",
@@ -50,6 +50,6 @@ import mingshe.core
     ],
 )
 def test_compile(raw, result):
-    assert ast.dump(ast.parse(mingshe.core.compile(inspect.cleandoc(raw)))) == ast.dump(
-        ast.parse(inspect.cleandoc(result))
-    )
+    assert ast.unparse(
+        ast.parse(mingshe.core.compile(inspect.cleandoc(raw)))
+    ) == ast.unparse(ast.parse(inspect.cleandoc(result)))

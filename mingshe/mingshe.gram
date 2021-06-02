@@ -150,9 +150,6 @@ arglist: argument (',' argument)*  [',']
 argument: ( test [comp_for] |
             test ':=' test |
             test '=' test |
-            '**?' |
-            '*?' |
-            '?' |
             '**' test |
             '*' test )
 

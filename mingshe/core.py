@@ -1,23 +1,9 @@
+import ast
 from typing import Union
 
 from parso.python.tree import Operator, PythonNode, PythonLeaf
 
 from .grammar import MíngShéGrammar
-
-grammar = MíngShéGrammar()
-
-code = """
-1 |> print
-
-range(10) |> sum |> print
-
-1 |> (lambda x: x**2)
-
-def t():
-    "call t" |> print
-"""
-
-module = grammar.parse(code)
 
 
 def swap_prefix(
@@ -55,34 +41,79 @@ class PipeTransformer(ParsoNodeTransformer):
     def visit_node(self, node: PythonNode):
         i = 0
         while i < len(node.children):
-            if (
-                isinstance(node.children[i], Operator)
-                and node.children[i].value == "|>"
+            if isinstance(node.children[i], Operator) and node.children[i].value in (
+                "|>",
+                "||>",
+                "|||>",
             ):
                 func_leaf = node.children[i + 1]
                 param_leaf = node.children[i - 1]
                 swap_prefix(func_leaf, param_leaf)
-                node.children[i - 1 : i + 2] = [
-                    PythonNode(
-                        "pipe_call",
-                        [
-                            func_leaf,
-                            Operator("(", func_leaf.start_pos),
-                            param_leaf,
-                            Operator(")", func_leaf.start_pos),
-                        ],
-                    ),
-                ]
+                if node.children[i].value == "|>":
+                    node.children[i - 1 : i + 2] = [
+                        PythonNode(
+                            "pipe_call",
+                            [
+                                func_leaf,
+                                Operator("(", func_leaf.start_pos),
+                                param_leaf,
+                                Operator(")", func_leaf.start_pos),
+                            ],
+                        ),
+                    ]
+                elif node.children[i].value == "||>":
+                    node.children[i - 1 : i + 2] = [
+                        PythonNode(
+                            "pipe_call",
+                            [
+                                func_leaf,
+                                Operator("(", func_leaf.start_pos),
+                                PythonNode(
+                                    "",
+                                    [
+                                        Operator("*", func_leaf.start_pos),
+                                        Operator("(", func_leaf.start_pos),
+                                        param_leaf,
+                                        Operator(")", func_leaf.start_pos),
+                                    ],
+                                ),
+                                Operator(")", func_leaf.start_pos),
+                            ],
+                        ),
+                    ]
+                elif node.children[i].value == "|||>":
+                    node.children[i - 1 : i + 2] = [
+                        PythonNode(
+                            "pipe_call",
+                            [
+                                func_leaf,
+                                Operator("(", func_leaf.start_pos),
+                                PythonNode(
+                                    "",
+                                    [
+                                        Operator("**", func_leaf.start_pos),
+                                        Operator("(", func_leaf.start_pos),
+                                        param_leaf,
+                                        Operator(")", func_leaf.start_pos),
+                                    ],
+                                ),
+                                Operator(")", func_leaf.start_pos),
+                            ],
+                        ),
+                    ]
+                else:
+                    pass
+
                 i -= 1
             else:
                 i += 1
 
 
-v = ParsoNodeTransformer(module)
-v.visit()
+def compile(code: str) -> ast.AST:
+    grammar = MíngShéGrammar()
+    module = grammar.parse(code)
 
+    v = PipeTransformer()
+    v.transform(module)
 
-from mingshe.reformat import reformat
-
-print(code)
-print(reformat(v.root.get_code()))
+    return ast.parse(module.get_code())
