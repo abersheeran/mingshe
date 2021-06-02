@@ -106,8 +106,10 @@ comparison: expr (comp_op expr)*
 # sake of a __future__ import described in PEP 401 (which really works :-)
 comp_op: '<'|'>'|'=='|'>='|'<='|'<>'|'!='|'in'|'not' 'in'|'is'|'is' 'not'
 star_expr: '*' expr
+# extend pipe expr
 expr: pipe_expr ('|>' pipe_expr)*
 pipe_expr: xor_expr ('|' xor_expr)*
+# end extend
 xor_expr: and_expr ('^' and_expr)*
 and_expr: shift_expr ('&' shift_expr)*
 shift_expr: arith_expr (('<<'|'>>') arith_expr)*
@@ -148,6 +150,9 @@ arglist: argument (',' argument)*  [',']
 argument: ( test [comp_for] |
             test ':=' test |
             test '=' test |
+            '**?' |
+            '*?' |
+            '?' |
             '**' test |
             '*' test )
 

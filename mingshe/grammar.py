@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Iterable, List
 
-from parso.python.tokenize import PythonToken
+from parso.python.tokenize import OP, ERRORTOKEN, PythonToken
 from parso.grammar import PythonGrammar, parse_version_string
 
 
@@ -22,8 +22,11 @@ def merge_operators(tokens: Iterable[PythonToken]) -> List[PythonToken]:
             )
             del result[l:]
             result.append(token_info)
+        elif token.type == ERRORTOKEN and token.string == "?":
+            result.append(PythonToken(token.type, "?", token.start_pos, token.prefix))
         else:
             result.append(token)
+    print(result)
     return result
 
 

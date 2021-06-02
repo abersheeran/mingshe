@@ -1,5 +1,5 @@
 from typing import Tuple
-from parso.tree import Node, NodeOrLeaf
+from parso.tree import NodeOrLeaf
 from mingshe.grammar import MíngShéGrammar
 
 
@@ -14,6 +14,8 @@ range(10) |> sum |> print
 
 def t():
     "call t" |> print
+
+1 |> print("output:", ?)
 """
 
 module = grammar.parse(code)
@@ -34,7 +36,7 @@ def swap_prefix(left: NodeOrLeaf, right: NodeOrLeaf) -> Tuple[NodeOrLeaf, NodeOr
             return swap_prefix(left.children[0], right.children[0])
 
 
-class ParsoNodeVisitor:
+class ParsoNodeTransformer:
     def __init__(self, root: Module) -> None:
         self.root = root
 
@@ -45,6 +47,7 @@ class ParsoNodeVisitor:
         if not hasattr(point, "children"):
             return
         for node in point.children:
+            print(node)
             if isinstance(node, PythonNode):
                 self.visit_node(node)
             else:
@@ -80,11 +83,12 @@ class ParsoNodeVisitor:
                 i += 1
 
 
-v = ParsoNodeVisitor(module)
+v = ParsoNodeTransformer(module)
 v.visit()
 
-import ast
-import astunparse
+
+from mingshe.reformat import reformat
 
 print(code)
-print(astunparse.unparse(ast.parse(v.root.get_code())))
+print(v.root.get_code())
+print(reformat(v.root.get_code()))
