@@ -1119,6 +1119,9 @@ inversion (memo):
     | 'not' a=inversion { ast.UnaryOp(op=ast.Not(), operand=a, LOCATIONS) }
     | comparison
 
+pipe_expression:
+    | a=expression b=('|>' c=expression { c })+ { ast.Call(func=c, args=a, LOCATIONS) }
+
 # Comparisons operators
 # ---------------------
 
