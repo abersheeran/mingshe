@@ -46,6 +46,6 @@ import mingshe.core
     ],
 )
 def test_compile(raw, result):
-    assert ast.dump(ast.parse(mingshe.core.compile(inspect.cleandoc(raw)))) == ast.dump(
+    assert ast.dump(mingshe.core.compile(inspect.cleandoc(raw))) == ast.dump(
         ast.parse(inspect.cleandoc(result))
     )

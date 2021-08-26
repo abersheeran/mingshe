@@ -1,4 +1,5 @@
 import ast
+import builtins
 import token
 from io import StringIO
 from tokenize import TokenInfo, generate_tokens
@@ -43,11 +44,25 @@ def compile(
     filename: str = "<unknown>",
     verbose_tokenizer: bool = False,
     verbose_parser: bool = False,
-) -> str:
+) -> ast.AST:
     tokengen = iter(merge_operators(tokenize(s)))
     tokenizer = Tokenizer(tokengen, verbose=verbose_tokenizer)
     parser = PythonParser(tokenizer, filename=filename, verbose=verbose_parser)
     tree = parser.start()
     if tree is None:
         parser.raise_syntax_error("")
-    return ast.unparse(tree)
+    return tree
+
+
+def exec(
+    s: str,
+    filename: str = "<unknown>",
+    verbose_tokenizer: bool = False,
+    verbose_parser: bool = False,
+) -> None:
+    return builtins.exec(
+        builtins.compile(
+            compile(s, filename, verbose_tokenizer, verbose_parser),
+            filename, "exec"
+        )
+    )
