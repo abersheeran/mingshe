@@ -19,19 +19,21 @@ def tokenize(s: str) -> Iterable[TokenInfo]:
 def merge_operators(tokens: Iterable[TokenInfo]) -> List[TokenInfo]:
     result = []
     for toknum, tokval, (srow, scol), (erow, ecol), linenum in tokens:
-        if tokval == ">" and result[-1].string == "|":  # pipe operator
-            if result[-2][1] == "|":  # ||>
-                token_info = TokenInfo(
-                    token.OP, "||>", result[-2][2], (erow, ecol), linenum
-                )
-                del result[-2:]
-            else:  # |>
-                token_info = TokenInfo(
-                    token.OP, "|>", result[-1][2], (erow, ecol), linenum
-                )
-                del result[-1]
+        if tokval == ">" and result[-1].string == "|":  # |>
+            token_info = TokenInfo(token.OP, "|>", result[-1][2], (erow, ecol), linenum)
+            del result[-1]
             result.append(token_info)
             continue
+        elif tokval == "?":
+            token_info = TokenInfo(token.OP, "?", (srow, scol), (erow, ecol), linenum)
+            result.append(token_info)
+            continue
+        elif tokval == ">" and result[-1].string == "=":  # =>
+            token_info = TokenInfo(token.OP, "=>", result[-1][2], (erow, ecol), linenum)
+            del result[-1]
+            result.append(token_info)
+            continue
+
         result.append(TokenInfo(toknum, tokval, (srow, scol), (erow, ecol), linenum))
     return result
 
@@ -42,7 +44,7 @@ def compile(
     verbose_tokenizer: bool = False,
     verbose_parser: bool = False,
 ) -> str:
-    tokengen = tokenize(s)
+    tokengen = iter(merge_operators(tokenize(s)))
     tokenizer = Tokenizer(tokengen, verbose=verbose_tokenizer)
     parser = PythonParser(tokenizer, filename=filename, verbose=verbose_parser)
     tree = parser.start()

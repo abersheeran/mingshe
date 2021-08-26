@@ -1119,17 +1119,14 @@ inversion (memo):
     | 'not' a=inversion { ast.UnaryOp(op=ast.Not(), operand=a, LOCATIONS) }
     | comparison
 
-pipe_expression:
-    | a=expression b=('|>' c=expression { c })+ { ast.Call(func=c, args=a, LOCATIONS) }
-
 # Comparisons operators
 # ---------------------
 
 comparison:
-    | a=bitwise_or b=compare_op_bitwise_or_pair+ {
+    | a=pipe_expression b=compare_op_bitwise_or_pair+ {
         ast.Compare(left=a, ops=self.get_comparison_ops(b), comparators=self.get_comparators(b), LOCATIONS)
      }
-    | bitwise_or
+    | pipe_expression
 
 # Make a tuple of operator and comparator
 compare_op_bitwise_or_pair:
@@ -1144,21 +1141,25 @@ compare_op_bitwise_or_pair:
     | isnot_bitwise_or
     | is_bitwise_or
 
-eq_bitwise_or: '==' a=bitwise_or { (ast.Eq(), a) }
+eq_bitwise_or: '==' a=pipe_expression { (ast.Eq(), a) }
 # Do not support the Barry as BDFL <> for not eq
 noteq_bitwise_or[tuple]:
-    | '!=' a=bitwise_or { (ast.NotEq(), a) }
-lte_bitwise_or: '<=' a=bitwise_or { (ast.LtE(), a) }
-lt_bitwise_or: '<' a=bitwise_or { (ast.Lt(), a) }
-gte_bitwise_or: '>=' a=bitwise_or { (ast.GtE(), a) }
-gt_bitwise_or: '>' a=bitwise_or { (ast.Gt(), a) }
-notin_bitwise_or: 'not' 'in' a=bitwise_or { (ast.NotIn(), a) }
-in_bitwise_or: 'in' a=bitwise_or { (ast.In(), a) }
-isnot_bitwise_or: 'is' 'not' a=bitwise_or { (ast.IsNot(), a) }
-is_bitwise_or: 'is' a=bitwise_or { (ast.Is(), a) }
+    | '!=' a=pipe_expression { (ast.NotEq(), a) }
+lte_bitwise_or: '<=' a=pipe_expression { (ast.LtE(), a) }
+lt_bitwise_or: '<' a=pipe_expression { (ast.Lt(), a) }
+gte_bitwise_or: '>=' a=pipe_expression { (ast.GtE(), a) }
+gt_bitwise_or: '>' a=pipe_expression { (ast.Gt(), a) }
+notin_bitwise_or: 'not' 'in' a=pipe_expression { (ast.NotIn(), a) }
+in_bitwise_or: 'in' a=pipe_expression { (ast.In(), a) }
+isnot_bitwise_or: 'is' 'not' a=pipe_expression { (ast.IsNot(), a) }
+is_bitwise_or: 'is' a=pipe_expression { (ast.Is(), a) }
 
 # Logical operators
 # -----------------
+
+pipe_expression:
+    | a=pipe_expression '|>' b=bitwise_or { ast.Call(func=b, args=[a], keywords=[], LOCATIONS) }
+    | bitwise_or
 
 bitwise_or:
     | a=bitwise_or '|' b=bitwise_xor { ast.BinOp(left=a, op=ast.BitOr(), right=b, LOCATIONS) }
