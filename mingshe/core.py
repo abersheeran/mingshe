@@ -1,12 +1,12 @@
 import ast
 import token
-from tokenize import TokenInfo, generate_tokens
 from io import StringIO
+from tokenize import TokenInfo, generate_tokens
 from typing import Iterable, List
 
 from pegen.tokenizer import Tokenizer
 
-from .parse import PythonParser
+from .parser import PythonParser
 
 
 def tokenize(s: str) -> Iterable[TokenInfo]:

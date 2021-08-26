@@ -9390,8 +9390,8 @@ class PythonParser(Parser):
         self._reset(mark)
         return None
 
-    KEYWORDS = ('with', 'and', 'True', 'class', 'in', 'nonlocal', 'await', 'or', 'not', 'break', 'raise', 'yield', 'while', 'return', 'elif', 'lambda', 'try', 'del', 'is', 'finally', 'import', 'def', 'else', 'as', 'from', 'pass', 'global', 'False', 'for', 'if', 'assert', 'None', 'async', 'except', 'continue')
-    SOFT_KEYWORDS = ('match', '_', 'case')
+    KEYWORDS = ('del', 'import', 'global', 'def', 'raise', 'finally', 'elif', 'is', 'continue', 'async', 'class', 'await', 'None', 'if', 'yield', 'not', 'True', 'with', 'break', 'except', 'nonlocal', 'lambda', 'pass', 'from', 'else', 'assert', 'False', 'or', 'in', 'return', 'while', 'for', 'and', 'as', 'try')
+    SOFT_KEYWORDS = ('match', 'case', '_')
 
 
 if __name__ == '__main__':

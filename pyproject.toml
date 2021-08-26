@@ -33,6 +33,7 @@ mingshe = 'mingshe.commands:main'
 
 [tool.isort]
 profile = "black"
+skip = ["mingshe/_vendor", "mingshe/parser.py"]
 
 [build-system]
 build-backend = "poetry.masonry.api"
