@@ -14,7 +14,7 @@ range(10) |> sum |> print
 print(sum(range(10)))
 ```
 
-## Ternary
+## Conditional
 
 Example:
 
