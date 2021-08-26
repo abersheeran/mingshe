@@ -14,10 +14,6 @@ import mingshe.core
             "print(1)",
         ),
         (
-            "(1, 11) ||> range",
-            "range(*(1, 11))",
-        ),
-        (
             "[1] |> max",
             "max([1])",
         ),
