@@ -1301,6 +1301,9 @@ lambdef:
     | 'lambda' a=[lambda_params] ':' b=expression {
         ast.Lambda(args=a or self.make_arguments(None, [], None, [], (None, [], None)), body=b, LOCATIONS)
      }
+    | a=[lambda_params] '=>' b=expression {
+        ast.Lambda(args=a or self.make_arguments(None, [], None, [], (None, [], None)), body=b, LOCATIONS)
+     }
 
 lambda_params:
     | invalid_lambda_parameters
