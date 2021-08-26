@@ -1123,43 +1123,46 @@ inversion (memo):
 # ---------------------
 
 comparison:
-    | a=pipe_expression b=compare_op_bitwise_or_pair+ {
+    | a=pipe_expression b=compare_op_pipe_expression_pair+ {
         ast.Compare(left=a, ops=self.get_comparison_ops(b), comparators=self.get_comparators(b), LOCATIONS)
      }
     | pipe_expression
 
 # Make a tuple of operator and comparator
-compare_op_bitwise_or_pair:
-    | eq_bitwise_or
-    | noteq_bitwise_or
-    | lte_bitwise_or
-    | lt_bitwise_or
-    | gte_bitwise_or
-    | gt_bitwise_or
-    | notin_bitwise_or
-    | in_bitwise_or
-    | isnot_bitwise_or
-    | is_bitwise_or
+compare_op_pipe_expression_pair:
+    | eq_pipe_expression
+    | noteq_pipe_expression
+    | lte_pipe_expression
+    | lt_pipe_expression
+    | gte_pipe_expression
+    | gt_pipe_expression
+    | notin_pipe_expression
+    | in_pipe_expression
+    | isnot_pipe_expression
+    | is_pipe_expression
 
-eq_bitwise_or: '==' a=pipe_expression { (ast.Eq(), a) }
+eq_pipe_expression: '==' a=pipe_expression { (ast.Eq(), a) }
 # Do not support the Barry as BDFL <> for not eq
-noteq_bitwise_or[tuple]:
+noteq_pipe_expression[tuple]:
     | '!=' a=pipe_expression { (ast.NotEq(), a) }
-lte_bitwise_or: '<=' a=pipe_expression { (ast.LtE(), a) }
-lt_bitwise_or: '<' a=pipe_expression { (ast.Lt(), a) }
-gte_bitwise_or: '>=' a=pipe_expression { (ast.GtE(), a) }
-gt_bitwise_or: '>' a=pipe_expression { (ast.Gt(), a) }
-notin_bitwise_or: 'not' 'in' a=pipe_expression { (ast.NotIn(), a) }
-in_bitwise_or: 'in' a=pipe_expression { (ast.In(), a) }
-isnot_bitwise_or: 'is' 'not' a=pipe_expression { (ast.IsNot(), a) }
-is_bitwise_or: 'is' a=pipe_expression { (ast.Is(), a) }
+lte_pipe_expression: '<=' a=pipe_expression { (ast.LtE(), a) }
+lt_pipe_expression: '<' a=pipe_expression { (ast.Lt(), a) }
+gte_pipe_expression: '>=' a=pipe_expression { (ast.GtE(), a) }
+gt_pipe_expression: '>' a=pipe_expression { (ast.Gt(), a) }
+notin_pipe_expression: 'not' 'in' a=pipe_expression { (ast.NotIn(), a) }
+in_pipe_expression: 'in' a=pipe_expression { (ast.In(), a) }
+isnot_pipe_expression: 'is' 'not' a=pipe_expression { (ast.IsNot(), a) }
+is_pipe_expression: 'is' a=pipe_expression { (ast.Is(), a) }
 
-# Logical operators
-# -----------------
+# Pipe operators
+# --------------
 
 pipe_expression:
     | a=pipe_expression '|>' b=bitwise_or { ast.Call(func=b, args=[a], keywords=[], LOCATIONS) }
     | bitwise_or
+
+# Logical operators
+# -----------------
 
 bitwise_or:
     | a=bitwise_or '|' b=bitwise_xor { ast.BinOp(left=a, op=ast.BitOr(), right=b, LOCATIONS) }
