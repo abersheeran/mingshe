@@ -3019,7 +3019,7 @@ class PythonParser(Parser):
 
     @memoize
     def expression(self) -> Optional[Any]:
-        # expression: invalid_expression | disjunction 'if' disjunction 'else' expression | disjunction | lambdef
+        # expression: invalid_expression | disjunction 'if' disjunction 'else' expression | disjunction '?' disjunction ':' expression | disjunction | lambdef
         mark = self._mark()
         tok = self._tokenizer.peek()
         start_lineno, start_col_offset = tok.start
@@ -3036,6 +3036,21 @@ class PythonParser(Parser):
             (b := self.disjunction())
             and
             (literal_1 := self.expect('else'))
+            and
+            (c := self.expression())
+        ):
+            tok = self._tokenizer.get_last_non_whitespace_token()
+            end_lineno, end_col_offset = tok.end
+            return ast . IfExp ( body = a , test = b , orelse = c , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
+        self._reset(mark)
+        if (
+            (b := self.disjunction())
+            and
+            (literal := self.expect('?'))
+            and
+            (a := self.disjunction())
+            and
+            (literal_1 := self.expect(':'))
             and
             (c := self.expression())
         ):
@@ -9402,8 +9417,8 @@ class PythonParser(Parser):
         self._reset(mark)
         return None
 
-    KEYWORDS = ('yield', 'elif', 'else', 'import', 'def', 'if', 'global', 'and', 'lambda', 'for', 'pass', 'not', 'nonlocal', 'finally', 'assert', 'False', 'in', 'is', 'async', 'break', 'try', 'await', 'from', 'True', 'class', 'with', 'continue', 'except', 'raise', 'None', 'or', 'while', 'as', 'return', 'del')
-    SOFT_KEYWORDS = ('_', 'case', 'match')
+    KEYWORDS = ('as', 'or', 'class', 'False', 'global', 'True', 'from', 'with', 'finally', 'await', 'try', 'if', 'except', 'in', 'break', 'import', 'pass', 'and', 'else', 'yield', 'raise', 'elif', 'assert', 'not', 'None', 'async', 'nonlocal', 'is', 'lambda', 'del', 'return', 'def', 'while', 'continue', 'for')
+    SOFT_KEYWORDS = ('match', 'case', '_')
 
 
 if __name__ == '__main__':

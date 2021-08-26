@@ -9,6 +9,7 @@ import mingshe.core
 @pytest.mark.parametrize(
     "raw,result",
     [
+        # 管道运算符
         (
             "1 |> print",
             "print(1)",
@@ -43,6 +44,15 @@ import mingshe.core
             "10 |> partial(print, 'num:')",
             "partial(print, 'num:')(10)",
         ),
+        # 三元运算符
+        (
+            "a ? b : c",
+            "b if a else c",
+        ),
+        (
+            "a ? (b ? d : e) : c",
+            "(d if b else e) if a else c",
+        )
     ],
 )
 def test_compile(raw, result):

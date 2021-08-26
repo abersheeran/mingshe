@@ -1059,6 +1059,9 @@ expression (memo):
     | a=disjunction 'if' b=disjunction 'else' c=expression {
         ast.IfExp(body=a, test=b, orelse=c, LOCATIONS)
      }
+    | b=disjunction '?' a=disjunction ':' c=expression {
+        ast.IfExp(body=a, test=b, orelse=c, LOCATIONS)
+     }
     | disjunction
     | lambdef
 
