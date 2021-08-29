@@ -55,7 +55,19 @@ import mingshe.core
         )
     ],
 )
-def test_compile(raw, result):
+def test_right_example(raw, result):
     assert ast.dump(mingshe.core.compile(inspect.cleandoc(raw))) == ast.dump(
         ast.parse(inspect.cleandoc(result))
     )
+
+
+@pytest.mark.parametrize(
+    "string",
+    [
+        "1 |> ",
+        "a ? b",
+    ]
+)
+def test_wrong_example(string):
+    with pytest.raises(SyntaxError):
+        mingshe.core.compile(string)
