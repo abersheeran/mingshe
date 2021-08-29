@@ -1624,6 +1624,7 @@ invalid_kwarg[NoReturn]:
 
 expression_without_invalid[ast.AST]:
     | a=disjunction 'if' b=disjunction 'else' c=expression { ast.IfExp(body=b, test=a, orelse=c, LOCATIONS) }
+    | b=disjunction '?' a=disjunction ':' c=expression { ast.IfExp(body=a, test=b, orelse=c, LOCATIONS) }
     | disjunction
     | lambdef
 invalid_legacy_expression:
@@ -1642,6 +1643,9 @@ invalid_expression[NoReturn]:
      }
     | a=disjunction 'if' b=disjunction !('else'|':') {
         self.store_syntax_error_known_range("expected 'else' after 'if' expression", a, b)
+     }
+    | b=disjunction '?' a=disjunction !':' {
+        self.store_syntax_error_known_range("expected ':' after '?' expression", b, a)
      }
 invalid_named_expression[NoReturn]:
     | a=expression ':=' expression {

@@ -5374,7 +5374,7 @@ class PythonParser(Parser):
 
     @memoize
     def expression_without_invalid(self) -> Optional[ast . AST]:
-        # expression_without_invalid: disjunction 'if' disjunction 'else' expression | disjunction | lambdef
+        # expression_without_invalid: disjunction 'if' disjunction 'else' expression | disjunction '?' disjunction ':' expression | disjunction | lambdef
         mark = self._mark()
         tok = self._tokenizer.peek()
         start_lineno, start_col_offset = tok.start
@@ -5392,6 +5392,21 @@ class PythonParser(Parser):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
             return ast . IfExp ( body = b , test = a , orelse = c , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
+        self._reset(mark)
+        if (
+            (b := self.disjunction())
+            and
+            (literal := self.expect('?'))
+            and
+            (a := self.disjunction())
+            and
+            (literal_1 := self.expect(':'))
+            and
+            (c := self.expression())
+        ):
+            tok = self._tokenizer.get_last_non_whitespace_token()
+            end_lineno, end_col_offset = tok.end
+            return ast . IfExp ( body = a , test = b , orelse = c , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
         self._reset(mark)
         if (
             (disjunction := self.disjunction())
@@ -5422,7 +5437,7 @@ class PythonParser(Parser):
 
     @memoize
     def invalid_expression(self) -> Optional[NoReturn]:
-        # invalid_expression: invalid_legacy_expression | !(NAME STRING | SOFT_KEYWORD) disjunction expression_without_invalid | disjunction 'if' disjunction !('else' | ':')
+        # invalid_expression: invalid_legacy_expression | !(NAME STRING | SOFT_KEYWORD) disjunction expression_without_invalid | disjunction 'if' disjunction !('else' | ':') | disjunction '?' disjunction !':'
         mark = self._mark()
         if (
             (invalid_legacy_expression := self.invalid_legacy_expression())
@@ -5448,6 +5463,17 @@ class PythonParser(Parser):
             self.negative_lookahead(self._tmp_145, )
         ):
             return self . store_syntax_error_known_range ( "expected 'else' after 'if' expression" , a , b )
+        self._reset(mark)
+        if (
+            (b := self.disjunction())
+            and
+            (literal := self.expect('?'))
+            and
+            (a := self.disjunction())
+            and
+            self.negative_lookahead(self.expect, ':')
+        ):
+            return self . store_syntax_error_known_range ( "expected ':' after '?' expression" , b , a )
         self._reset(mark)
         return None
 
@@ -9417,7 +9443,7 @@ class PythonParser(Parser):
         self._reset(mark)
         return None
 
-    KEYWORDS = ('as', 'or', 'class', 'False', 'global', 'True', 'from', 'with', 'finally', 'await', 'try', 'if', 'except', 'in', 'break', 'import', 'pass', 'and', 'else', 'yield', 'raise', 'elif', 'assert', 'not', 'None', 'async', 'nonlocal', 'is', 'lambda', 'del', 'return', 'def', 'while', 'continue', 'for')
+    KEYWORDS = ('else', 'import', 'continue', 'del', 'with', 'yield', 'finally', 'in', 'assert', 'async', 'elif', 'if', 'global', 'for', 'def', 'try', 'True', 'pass', 'lambda', 'as', 'while', 'or', 'await', 'class', 'and', 'return', 'break', 'nonlocal', 'from', 'except', 'False', 'is', 'None', 'not', 'raise')
     SOFT_KEYWORDS = ('match', 'case', '_')
 
 
