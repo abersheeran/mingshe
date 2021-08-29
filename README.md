@@ -2,6 +2,12 @@
 
 A better [Python](https://www.python.org/) superset language.
 
+## Install
+
+```
+pip install mingshe
+```
+
 ## Pipe
 
 Example:
@@ -9,6 +15,8 @@ Example:
 ```
 range(10) |> sum |> print
 ```
+
+Compile to:
 
 ```python
 print(sum(range(10)))
@@ -21,6 +29,8 @@ Example:
 ```
 a ? b : c
 ```
+
+Compile to:
 
 ```python
 b if a else c
