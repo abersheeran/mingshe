@@ -4041,7 +4041,7 @@ class PythonParser(Parser):
 
     @memoize
     def lambdef(self) -> Optional[Any]:
-        # lambdef: 'lambda' lambda_params? ':' expression
+        # lambdef: 'lambda' lambda_params? ':' expression | lambda_params? '=>' expression
         mark = self._mark()
         tok = self._tokenizer.peek()
         start_lineno, start_col_offset = tok.start
@@ -4051,6 +4051,17 @@ class PythonParser(Parser):
             (a := self.lambda_params(),)
             and
             (literal_1 := self.expect(':'))
+            and
+            (b := self.expression())
+        ):
+            tok = self._tokenizer.get_last_non_whitespace_token()
+            end_lineno, end_col_offset = tok.end
+            return ast . Lambda ( args = a or self . make_arguments ( None , [] , None , [] , ( None , [] , None ) ) , body = b , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
+        self._reset(mark)
+        if (
+            (a := self.lambda_params(),)
+            and
+            (literal := self.expect('=>'))
             and
             (b := self.expression())
         ):
@@ -9417,8 +9428,8 @@ class PythonParser(Parser):
         self._reset(mark)
         return None
 
-    KEYWORDS = ('as', 'or', 'class', 'False', 'global', 'True', 'from', 'with', 'finally', 'await', 'try', 'if', 'except', 'in', 'break', 'import', 'pass', 'and', 'else', 'yield', 'raise', 'elif', 'assert', 'not', 'None', 'async', 'nonlocal', 'is', 'lambda', 'del', 'return', 'def', 'while', 'continue', 'for')
-    SOFT_KEYWORDS = ('match', 'case', '_')
+    KEYWORDS = ('is', 'not', 'async', 'def', 'as', 'global', 'for', 'in', 'elif', 'True', 'from', 'try', 'lambda', 'raise', 'while', 'except', 'pass', 'yield', 'None', 'import', 'if', 'False', 'finally', 'assert', 'continue', 'or', 'return', 'nonlocal', 'and', 'del', 'else', 'break', 'await', 'class', 'with')
+    SOFT_KEYWORDS = ('_', 'case', 'match')
 
 
 if __name__ == '__main__':
