@@ -8,7 +8,7 @@ from .core import compile, exec
 
 def main():
     argparser = argparse.ArgumentParser(description=f"MíngShé {__version__}")
-    argparser.add_argument("filepath", type=Path, help="The .ms file")
+    argparser.add_argument("filepath", type=Path, help="The .she file")
     argparser.add_argument(
         "--compile", dest="compile", action="store_true", help="Only compile"
     )
