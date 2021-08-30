@@ -9,13 +9,10 @@ import mingshe.core
 @pytest.mark.parametrize(
     "raw,result",
     [
+        # 管道运算符
         (
             "1 |> print",
             "print(1)",
-        ),
-        (
-            "(1, 11) ||> range",
-            "range(*(1, 11))",
         ),
         (
             "[1] |> max",
@@ -47,9 +44,30 @@ import mingshe.core
             "10 |> partial(print, 'num:')",
             "partial(print, 'num:')(10)",
         ),
+        # 三元运算符
+        (
+            "a ? b : c",
+            "b if a else c",
+        ),
+        (
+            "a ? (b ? d : e) : c",
+            "(d if b else e) if a else c",
+        )
     ],
 )
-def test_compile(raw, result):
-    assert ast.dump(ast.parse(mingshe.core.compile(inspect.cleandoc(raw)))) == ast.dump(
+def test_right_example(raw, result):
+    assert ast.dump(mingshe.core.compile(inspect.cleandoc(raw))) == ast.dump(
         ast.parse(inspect.cleandoc(result))
     )
+
+
+@pytest.mark.parametrize(
+    "string",
+    [
+        "1 |> ",
+        "a ? b",
+    ]
+)
+def test_wrong_example(string):
+    with pytest.raises(SyntaxError):
+        mingshe.core.compile(string)

@@ -4,7 +4,7 @@ description = ""
 license = "Apache-2.0"
 name = "mingshe"
 readme = "README.md"
-version = "0.1.0"
+version = "0.2.0"
 
 homepage = "https://github.com/abersheeran/mingshe"
 repository = "https://github.com/abersheeran/mingshe"
@@ -18,21 +18,15 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "^3.9"
 
 [tool.poetry.dev-dependencies]
-black = {version = "*", allow-prereleases = true}
-isort = "*"
-
 flake8 = "*"
 
 pytest = "^5.4.3"
 
 [tool.poetry.scripts]
 mingshe = 'mingshe.commands:main'
-
-[tool.isort]
-profile = "black"
 
 [build-system]
 build-backend = "poetry.masonry.api"
