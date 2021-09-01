@@ -35,3 +35,17 @@ Compile to:
 ```python
 b if a else c
 ```
+
+## Partial
+
+Example:
+
+```
+square = pow(?, 2)
+```
+
+Compile to:
+
+```python
+(lambda _p_0, /, pow: (lambda _0, /: pow(_0, _p_0)))(2, pow)
+```
