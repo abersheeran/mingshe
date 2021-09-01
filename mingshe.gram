@@ -244,6 +244,42 @@ class Parser(Parser):
             arg.type_comment = type_comment
         return arg
 
+    def make_partial_function(self,
+        func: str,
+        arguments: Tuple[list, list],
+        **locations,
+    ) -> ast.Lambda:
+        """"Build a partial function"""
+        args = arguments[0] if arguments else []
+        kwargs = arguments[1] if arguments else []
+        count = 0
+        for i in range(len(args)):
+            if args[i] == "?":
+                args[i] = ast.Name(id=f"_{count}", ctx=ast.Load(), **locations)
+                count += 1
+            elif isinstance(args[i], ast.Starred) and args[i].value == "?":
+                args[i] = ast.Starred(
+                    value=ast.Name(id=f"_{count}", ctx=ast.Load(), **locations),
+                    ctx=ast.Load(),
+                    **locations,
+                )
+                count += 1
+        for i in range(len(kwargs)):
+            if kwargs[i].value == "?":
+                kwargs[i] = ast.keyword(
+                    arg=kwargs[i].arg,
+                    value=ast.Name(id=f"_{count}", ctx=ast.Load()),
+                    **locations,
+                )
+                count += 1
+        return ast.Lambda(
+            args=self.make_arguments(
+                [(ast.arg(arg=f"_{i}"), None) for i in range(count)], [], None, None, None
+            ),
+            body=ast.Call(func=func, args=args, keywords=kwargs, **locations),
+            **locations,
+        )
+
     def make_arguments(self,
         pos_only: Optional[List[Tuple[ast.arg, None]]],
         pos_only_with_default: List[Tuple[ast.arg, Any]],
@@ -1232,6 +1268,7 @@ primary:
             LOCATIONS,
         )
      }
+    | a=primary '(' b=partial_arguments ')' { self.make_partial_function(a, b, LOCATIONS) }
     | a=primary '[' b=slices ']' { ast.Subscript(value=a, slice=b, ctx=Load, LOCATIONS) }
     | atom
 
@@ -1469,6 +1506,43 @@ kwarg_or_double_starred:
     | a=NAME '=' b=expression { ast.keyword(arg=a.string, value=b, LOCATIONS) }   # XXX Unreachable
     | '**' a=expression { ast.keyword(arg=None, value=a, LOCATIONS) }
 
+# Partial Call Arguments
+# ----------------------
+
+partial_arguments[Tuple[list, list]] (memo):
+    | a=partial_args [','] &')' { a }
+
+partial_args[Tuple[list, list]]:
+    | a=",".(partial_placeholder | partial_starred_expression | ( assignment_expression | expression !':=') !'=') + b=[',' k=kwargs {k}] {
+        (a + ([e for e in b if isinstance(e, ast.Starred)] if b else []),
+         ([e for e in b if not isinstance(e, ast.Starred)] if b else [])
+        )
+    }
+    | a=partial_kwargs {
+        ([e for e in a if isinstance(e, ast.Starred)],
+         [e for e in a if not isinstance(e, ast.Starred)])
+    }
+
+partial_kwargs[list]:
+    | a=','.partial_kwarg_or_starred+ ',' b=','.partial_kwarg_or_double_starred+ { a + b }
+    | ','.partial_kwarg_or_starred+
+    | ','.partial_kwarg_or_double_starred+
+
+partial_starred_expression:
+    | '*' a=(partial_placeholder | expression) { ast.Starred(value=a, ctx=Load, LOCATIONS) }
+
+partial_kwarg_or_starred:
+    | invalid_kwarg
+    | a=NAME '=' b=(partial_placeholder | expression) { ast.keyword(arg=a.string, value=b, LOCATIONS) }
+    | a=partial_starred_expression { a }
+
+partial_kwarg_or_double_starred:
+    | invalid_kwarg
+    | a=NAME '=' b=(partial_placeholder | expression) { ast.keyword(arg=a.string, value=b, LOCATIONS) }   # XXX Unreachable
+    | '**' a=(partial_placeholder | expression) { ast.keyword(arg=None, value=a, LOCATIONS) }
+
+partial_placeholder: '?' { "?" }
+
 # ASSIGNMENT TARGETS
 # ==================
 
@@ -1527,6 +1601,7 @@ t_primary:
             LOCATIONS,
         )
      }
+    | a=t_primary '(' b=partial_arguments ')' { self.make_partial_function(a, b, LOCATIONS) }
     | a=atom &t_lookahead { a }
 
 t_lookahead: '(' | '[' | '.'

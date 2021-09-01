@@ -52,6 +52,11 @@ import mingshe.core
         (
             "a ? (b ? d : e) : c",
             "(d if b else e) if a else c",
+        ),
+        # 偏函数
+        (
+            "f(?)",
+            "lambda _0: f(_0)",
         )
     ],
 )
