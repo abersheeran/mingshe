@@ -56,8 +56,12 @@ import mingshe.core
         # 偏函数
         (
             "f(?)",
-            "lambda _0: f(_0)",
-        )
+            "(lambda f: (lambda _0, /: f(_0)))(f)",
+        ),
+        (
+            "pow(?, 2)",
+            "(lambda _p_0, /, pow: (lambda _0, /: pow(_0, _p_0)))(2, pow)"
+        ),
     ],
 )
 def test_right_example(raw, result):

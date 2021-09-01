@@ -252,43 +252,74 @@ class Parser(Parser):
         return arg
 
     def make_partial_function(self,
-        func: str,
+        func: ast.Name,
         arguments: Tuple[list, list],
         **locations,
-    ) -> ast.Lambda:
+    ) -> Union[ast.Lambda, ast.Call]:
         """"Build a partial function"""
         args = arguments[0] if arguments else []
         kwargs = arguments[1] if arguments else []
-        count = 0
+        q_count = 0
+        bind_args = []
+        bind_kwargs = []
         for i in range(len(args)):
             if args[i] == "?":
-                args[i] = ast.Name(id=f"_{count}", ctx=ast.Load(), **locations)
-                count += 1
+                args[i] = ast.Name(id=f"_{q_count}", ctx=ast.Load(), **locations)
+                q_count += 1
             elif isinstance(args[i], ast.Starred) and args[i].value == "?":
                 args[i] = ast.Starred(
-                    value=ast.Name(id=f"_{count}", ctx=ast.Load(), **locations),
+                    value=ast.Name(id=f"_{q_count}", ctx=ast.Load(), **locations),
                     ctx=ast.Load(),
                     **locations,
                 )
-                count += 1
+                q_count += 1
+            else:
+                bind_args.append(args[i])
+                args[i] = ast.Name(id=f"_p_{len(bind_args)-1}", ctx=ast.Load(), **locations)
         for i in range(len(kwargs)):
             if kwargs[i].value == "?":
                 kwargs[i] = ast.keyword(
                     arg=kwargs[i].arg,
-                    value=ast.Name(id=f"_{count}", ctx=ast.Load()),
+                    value=ast.Name(id=f"_{q_count}", ctx=ast.Load()),
                     **locations,
                 )
-                count += 1
-        print(self.make_arguments(
-                [(ast.arg(arg=f"_{i}"), None) for i in range(count)], [], None, None, None
-            ).posonlyargs)
-        return ast.Lambda(
-            args=self.make_arguments(
-                [(ast.arg(arg=f"_{i}"), None) for i in range(count)], [], None, None, None
-            ),
-            body=ast.Call(func=func, args=args, keywords=kwargs, **locations),
-            **locations,
-        )
+                q_count += 1
+            else:
+                bind_kwargs.append(kwargs[i])
+                kwargs[i] = ast.keyword(
+                    arg=kwargs[i].arg,
+                    value=ast.Name(id=kwargs[i].arg, ctx=ast.Load()),
+                    **locations,
+                )
+
+        result = ast.Call(func=func, args=args, keywords=kwargs, **locations)
+        if q_count > 0:
+            lambda_body = ast.Lambda(
+                args=ast.arguments(
+                    posonlyargs=[ast.arg(arg=f"_{i}", **locations) for i in range(q_count)],
+                    kwonlyargs=[], args=[], defaults=[], vararg=None, kw_defaults=[], kwarg=None,
+                    **locations,
+                ),
+                body=result,
+                **locations,
+            )
+            result = ast.Call(
+                func=ast.Lambda(
+                    args=ast.arguments(
+                        posonlyargs=[ast.arg(arg=f"_p_{i}", **locations) for i in range(len(bind_args))],
+                        kwonlyargs=[ast.arg(arg=bind_kwargs[i].arg, **locations) for i in range(len(bind_kwargs))],
+                        args=[ast.arg(arg=func.id, **locations)],
+                        defaults=[], vararg=None, kw_defaults=[], kwarg=None,
+                        **locations,
+                    ),
+                    body=lambda_body,
+                    **locations,
+                ),
+                args=bind_args + [func],
+                keywords=bind_kwargs,
+                **locations,
+            )
+        return result
 
     def make_arguments(self,
         pos_only: Optional[List[Tuple[ast.arg, None]]],
@@ -5192,7 +5223,7 @@ class PythonParser(Parser):
 
     @memoize_left_rec
     def t_primary(self) -> Optional[Any]:
-        # t_primary: t_primary '.' NAME &t_lookahead | t_primary '[' slices ']' &t_lookahead | t_primary genexp &t_lookahead | t_primary '(' arguments? ')' &t_lookahead | t_primary '(' partial_arguments ')' | atom &t_lookahead
+        # t_primary: t_primary '.' NAME &t_lookahead | t_primary '[' slices ']' &t_lookahead | t_primary genexp &t_lookahead | t_primary '(' arguments? ')' &t_lookahead | t_primary '(' partial_arguments ')' &t_lookahead | atom &t_lookahead
         mark = self._mark()
         tok = self._tokenizer.peek()
         start_lineno, start_col_offset = tok.start
@@ -5258,6 +5289,8 @@ class PythonParser(Parser):
             (b := self.partial_arguments())
             and
             (literal_1 := self.expect(')'))
+            and
+            self.positive_lookahead(self.t_lookahead, )
         ):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
@@ -9924,8 +9957,8 @@ class PythonParser(Parser):
         self._reset(mark)
         return None
 
-    KEYWORDS = ('False', 'class', 'for', 'raise', 'else', 'return', 'while', 'elif', 'del', 'assert', 'global', 'import', 'if', 'lambda', 'not', 'with', 'async', 'def', 'as', 'in', 'except', 'continue', 'True', 'None', 'from', 'nonlocal', 'try', 'is', 'await', 'yield', 'finally', 'pass', 'break', 'or', 'and')
-    SOFT_KEYWORDS = ('_', 'match', 'case')
+    KEYWORDS = ('return', 'del', 'yield', 'finally', 'continue', 'elif', 'except', 'lambda', 'or', 'in', 'class', 'global', 'as', 'False', 'and', 'if', 'await', 'with', 'True', 'async', 'raise', 'nonlocal', 'from', 'import', 'try', 'is', 'None', 'else', 'break', 'pass', 'while', 'for', 'def', 'not', 'assert')
+    SOFT_KEYWORDS = ('_', 'case', 'match')
 
 
 if __name__ == '__main__':
