@@ -10,13 +10,25 @@ A better [Python](https://www.python.org/) superset language.
 pip install mingshe
 ```
 
-## Usage
+## Example
 
-```bash
-mingshe --help
+Write some code in `main.she`, then run `mingshe ./main.she` to execute code.
+
+```python
+import time
+
+start_time = time.time_ns()
+for _ in range(10 ** 6):
+    10 |> range |> map(pow(?, 2), ?) |> list
+end_time = time.time_ns()
+print("Time:", (end_time - start_time) / 10 ** 6, "ms")
 ```
 
-## Pipe
+You can also use `mingshe --compile ./main.she` to generate python file.
+
+## Extended syntax
+
+### Pipe
 
 Example:
 
@@ -30,7 +42,7 @@ Compile to:
 print(sum(range(10)))
 ```
 
-## Conditional
+### Conditional
 
 Example:
 
@@ -44,7 +56,7 @@ Compile to:
 b if a else c
 ```
 
-## Partial
+### Partial
 
 Example:
 
