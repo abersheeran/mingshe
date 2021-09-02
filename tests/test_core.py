@@ -60,8 +60,28 @@ import mingshe.core
         ),
         (
             "pow(?, 2)",
-            "(lambda _p_0, /, pow: (lambda _0, /: pow(_0, _p_0)))(2, pow)"
+            "(lambda pow: lambda _0, /: pow(_0, 2))(pow)",
         ),
+        (
+            "f(a, b=?)",
+            "(lambda _p_0, /, f: lambda _0, /: f(_p_0, b=_0))(a, f)",
+        ),
+        (
+            "f(?, b=0)",
+            "(lambda f: lambda _0, /: f(_0, b=0))(f)",
+        ),
+        (
+            "f(1, *?)",
+            "(lambda f: lambda _0, /: f(1, *_0))(f)",
+        ),
+        (
+            "f(a, **?)",
+            "(lambda _p_0, /, f: lambda _0, /: f(_p_0, **_0))(a, f)",
+        ),
+        (
+            "f(a, *?, **?)",
+            "(lambda _p_0, /, f: lambda _0, _1, /: f(_p_0, *_0, **_1))(a, f)",
+        )
     ],
 )
 def test_right_example(raw, result):

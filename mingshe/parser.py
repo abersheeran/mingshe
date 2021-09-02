@@ -273,6 +273,8 @@ class Parser(Parser):
                     **locations,
                 )
                 q_count += 1
+            elif isinstance(args[i], ast.Constant):
+                continue
             else:
                 bind_args.append(args[i])
                 args[i] = ast.Name(id=f"_p_{len(bind_args)-1}", ctx=ast.Load(), **locations)
@@ -280,15 +282,17 @@ class Parser(Parser):
             if kwargs[i].value == "?":
                 kwargs[i] = ast.keyword(
                     arg=kwargs[i].arg,
-                    value=ast.Name(id=f"_{q_count}", ctx=ast.Load()),
+                    value=ast.Name(id=f"_{q_count}", ctx=ast.Load(), **locations),
                     **locations,
                 )
                 q_count += 1
+            elif isinstance(kwargs[i].value, ast.Constant):
+                continue
             else:
                 bind_kwargs.append(kwargs[i])
                 kwargs[i] = ast.keyword(
                     arg=kwargs[i].arg,
-                    value=ast.Name(id=kwargs[i].arg, ctx=ast.Load()),
+                    value=ast.Name(id=kwargs[i].arg, ctx=ast.Load(), **locations),
                     **locations,
                 )
 
@@ -309,7 +313,8 @@ class Parser(Parser):
                         posonlyargs=[ast.arg(arg=f"_p_{i}", **locations) for i in range(len(bind_args))],
                         kwonlyargs=[ast.arg(arg=bind_kwargs[i].arg, **locations) for i in range(len(bind_kwargs))],
                         args=[ast.arg(arg=func.id, **locations)],
-                        defaults=[], vararg=None, kw_defaults=[], kwarg=None,
+                        kw_defaults=[None for _ in range(len(bind_kwargs))],
+                        defaults=[], vararg=None, kwarg=None,
                         **locations,
                     ),
                     body=lambda_body,
@@ -4840,7 +4845,7 @@ class PythonParser(Parser):
 
     @memoize
     def partial_arguments(self) -> Optional[Tuple [list , list]]:
-        # partial_arguments: partial_args ','? &')'
+        # partial_arguments: partial_args ','? &')' | invalid_arguments
         mark = self._mark()
         if (
             (a := self.partial_args())
@@ -4851,11 +4856,16 @@ class PythonParser(Parser):
         ):
             return a
         self._reset(mark)
+        if (
+            (invalid_arguments := self.invalid_arguments())
+        ):
+            return None  # pragma: no cover
+        self._reset(mark)
         return None
 
     @memoize
     def partial_args(self) -> Optional[Tuple [list , list]]:
-        # partial_args: ",".(partial_placeholder | partial_starred_expression | (assignment_expression | expression !':=') !'=')+ [',' kwargs] | partial_kwargs
+        # partial_args: ",".(partial_placeholder | partial_starred_expression | (assignment_expression | expression !':=') !'=')+ [',' partial_kwargs] | partial_kwargs
         mark = self._mark()
         if (
             (a := self._gather_126())
@@ -8530,12 +8540,12 @@ class PythonParser(Parser):
 
     @memoize
     def _tmp_128(self) -> Optional[Any]:
-        # _tmp_128: ',' kwargs
+        # _tmp_128: ',' partial_kwargs
         mark = self._mark()
         if (
             (literal := self.expect(','))
             and
-            (k := self.kwargs())
+            (k := self.partial_kwargs())
         ):
             return k
         self._reset(mark)
@@ -9957,8 +9967,8 @@ class PythonParser(Parser):
         self._reset(mark)
         return None
 
-    KEYWORDS = ('return', 'del', 'yield', 'finally', 'continue', 'elif', 'except', 'lambda', 'or', 'in', 'class', 'global', 'as', 'False', 'and', 'if', 'await', 'with', 'True', 'async', 'raise', 'nonlocal', 'from', 'import', 'try', 'is', 'None', 'else', 'break', 'pass', 'while', 'for', 'def', 'not', 'assert')
-    SOFT_KEYWORDS = ('_', 'case', 'match')
+    KEYWORDS = ('nonlocal', 'pass', 'False', 'lambda', 'else', 'return', 'and', 'finally', 'continue', 'with', 'None', 'if', 'global', 'async', 'except', 'break', 'for', 'try', 'class', 'elif', 'not', 'assert', 'yield', 'in', 'or', 'del', 'await', 'def', 'is', 'True', 'raise', 'import', 'as', 'from', 'while')
+    SOFT_KEYWORDS = ('match', '_', 'case')
 
 
 if __name__ == '__main__':

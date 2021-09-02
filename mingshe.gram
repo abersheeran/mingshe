@@ -266,6 +266,8 @@ class Parser(Parser):
                     **locations,
                 )
                 q_count += 1
+            elif isinstance(args[i], ast.Constant):
+                continue
             else:
                 bind_args.append(args[i])
                 args[i] = ast.Name(id=f"_p_{len(bind_args)-1}", ctx=ast.Load(), **locations)
@@ -273,15 +275,17 @@ class Parser(Parser):
             if kwargs[i].value == "?":
                 kwargs[i] = ast.keyword(
                     arg=kwargs[i].arg,
-                    value=ast.Name(id=f"_{q_count}", ctx=ast.Load()),
+                    value=ast.Name(id=f"_{q_count}", ctx=ast.Load(), **locations),
                     **locations,
                 )
                 q_count += 1
+            elif isinstance(kwargs[i].value, ast.Constant):
+                continue
             else:
                 bind_kwargs.append(kwargs[i])
                 kwargs[i] = ast.keyword(
                     arg=kwargs[i].arg,
-                    value=ast.Name(id=kwargs[i].arg, ctx=ast.Load()),
+                    value=ast.Name(id=kwargs[i].arg, ctx=ast.Load(), **locations),
                     **locations,
                 )
 
@@ -302,7 +306,8 @@ class Parser(Parser):
                         posonlyargs=[ast.arg(arg=f"_p_{i}", **locations) for i in range(len(bind_args))],
                         kwonlyargs=[ast.arg(arg=bind_kwargs[i].arg, **locations) for i in range(len(bind_kwargs))],
                         args=[ast.arg(arg=func.id, **locations)],
-                        defaults=[], vararg=None, kw_defaults=[], kwarg=None,
+                        kw_defaults=[None for _ in range(len(bind_kwargs))],
+                        defaults=[], vararg=None, kwarg=None,
                         **locations,
                     ),
                     body=lambda_body,
@@ -1545,9 +1550,10 @@ kwarg_or_double_starred:
 
 partial_arguments[Tuple[list, list]] (memo):
     | a=partial_args [','] &')' { a }
+    | invalid_arguments
 
 partial_args[Tuple[list, list]]:
-    | a=",".(partial_placeholder | partial_starred_expression | ( assignment_expression | expression !':=') !'=') + b=[',' k=kwargs {k}] {
+    | a=",".(partial_placeholder | partial_starred_expression | ( assignment_expression | expression !':=') !'=') + b=[',' k=partial_kwargs {k}] {
         (a + ([e for e in b if isinstance(e, ast.Starred)] if b else []),
          ([e for e in b if not isinstance(e, ast.Starred)] if b else [])
         )
