@@ -47,5 +47,5 @@ square = pow(?, 2)
 Compile to:
 
 ```python
-(lambda _p_0, /, pow: (lambda _0, /: pow(_0, _p_0)))(2, pow)
+(lambda pow: lambda _0, /: pow(_0, 2))(pow)
 ```
