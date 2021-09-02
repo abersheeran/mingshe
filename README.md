@@ -8,6 +8,12 @@ A better [Python](https://www.python.org/) superset language.
 pip install mingshe
 ```
 
+## Usage
+
+```bash
+mingshe --help
+```
+
 ## Pipe
 
 Example:
