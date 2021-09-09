@@ -81,7 +81,16 @@ import mingshe.core
         (
             "f(a, *?, **?)",
             "(lambda _p_0, /, f: lambda _0, _1, /: f(_p_0, *_0, **_1))(a, f)",
-        )
+        ),
+        # 空值合并
+        (
+            "a ?? b",
+            "a if a is not None else b",
+        ),
+        (
+            "a ?? b ?? c",
+            "(a if a is not None else b) if (a if a is not None else b) is not None else c",
+        ),
     ],
 )
 def test_right_example(raw, result):

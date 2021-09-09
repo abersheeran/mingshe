@@ -3094,7 +3094,7 @@ class PythonParser(Parser):
 
     @memoize
     def expression(self) -> Optional[Any]:
-        # expression: invalid_expression | disjunction 'if' disjunction 'else' expression | disjunction '?' disjunction ':' expression | disjunction | lambdef
+        # expression: invalid_expression | disjunction 'if' disjunction 'else' expression | disjunction '?' !'?' disjunction ':' expression | disjunction | lambdef
         mark = self._mark()
         tok = self._tokenizer.peek()
         start_lineno, start_col_offset = tok.start
@@ -3122,6 +3122,8 @@ class PythonParser(Parser):
             (b := self.disjunction())
             and
             (literal := self.expect('?'))
+            and
+            self.negative_lookahead(self.expect, '?')
             and
             (a := self.disjunction())
             and
@@ -3309,9 +3311,9 @@ class PythonParser(Parser):
         self._reset(mark)
         return None
 
-    @memoize
+    @memoize_left_rec
     def disjunction(self) -> Optional[Any]:
-        # disjunction: conjunction (('or' conjunction))+ | conjunction
+        # disjunction: conjunction (('or' conjunction))+ | disjunction '??' conjunction | conjunction
         mark = self._mark()
         tok = self._tokenizer.peek()
         start_lineno, start_col_offset = tok.start
@@ -3323,6 +3325,17 @@ class PythonParser(Parser):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
             return ast . BoolOp ( op = ast . Or ( ) , values = [a] + b , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
+        self._reset(mark)
+        if (
+            (a := self.disjunction())
+            and
+            (literal := self.expect('??'))
+            and
+            (b := self.conjunction())
+        ):
+            tok = self._tokenizer.get_last_non_whitespace_token()
+            end_lineno, end_col_offset = tok.end
+            return ast . IfExp ( body = a , test = ast . Compare ( left = a , ops = [ast . IsNot ( )] , comparators = [ast . Constant ( value = None , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )] , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset ) , orelse = b , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
         self._reset(mark)
         if (
             (conjunction := self.conjunction())
@@ -5693,7 +5706,7 @@ class PythonParser(Parser):
 
     @memoize
     def invalid_expression(self) -> Optional[NoReturn]:
-        # invalid_expression: invalid_legacy_expression | !(NAME STRING | SOFT_KEYWORD) disjunction expression_without_invalid | disjunction 'if' disjunction !('else' | ':') | disjunction '?' disjunction !':'
+        # invalid_expression: invalid_legacy_expression | !(NAME STRING | SOFT_KEYWORD) disjunction expression_without_invalid | disjunction 'if' disjunction !('else' | ':') | disjunction '?' !'?' disjunction !':'
         mark = self._mark()
         if (
             (invalid_legacy_expression := self.invalid_legacy_expression())
@@ -5724,6 +5737,8 @@ class PythonParser(Parser):
             (b := self.disjunction())
             and
             (literal := self.expect('?'))
+            and
+            self.negative_lookahead(self.expect, '?')
             and
             (a := self.disjunction())
             and
@@ -9967,8 +9982,8 @@ class PythonParser(Parser):
         self._reset(mark)
         return None
 
-    KEYWORDS = ('nonlocal', 'pass', 'False', 'lambda', 'else', 'return', 'and', 'finally', 'continue', 'with', 'None', 'if', 'global', 'async', 'except', 'break', 'for', 'try', 'class', 'elif', 'not', 'assert', 'yield', 'in', 'or', 'del', 'await', 'def', 'is', 'True', 'raise', 'import', 'as', 'from', 'while')
-    SOFT_KEYWORDS = ('match', '_', 'case')
+    KEYWORDS = ('await', 'del', 'nonlocal', 'finally', 'True', 'except', 'pass', 'False', 'try', 'while', 'from', 'import', 'with', 'not', 'global', 'class', 'is', 'or', 'break', 'if', 'else', 'raise', 'None', 'def', 'async', 'assert', 'and', 'for', 'yield', 'lambda', 'return', 'as', 'elif', 'continue', 'in')
+    SOFT_KEYWORDS = ('case', '_', 'match')
 
 
 if __name__ == '__main__':
