@@ -26,9 +26,15 @@ def merge_operators(tokens: Iterable[TokenInfo]) -> List[TokenInfo]:
             result.append(token_info)
             continue
         elif tokval == "?":
-            token_info = TokenInfo(token.OP, "?", (srow, scol), (erow, ecol), linenum)
-            result.append(token_info)
-            continue
+            if result[-1].string == "?":  # ??
+                token_info = TokenInfo(token.OP, "??", result[-1][2], (erow, ecol), linenum)
+                del result[-1]
+                result.append(token_info)
+                continue
+            else:
+                token_info = TokenInfo(token.OP, "?", (srow, scol), (erow, ecol), linenum)
+                result.append(token_info)
+                continue
         elif tokval == ">" and result[-1].string == "=":  # =>
             token_info = TokenInfo(token.OP, "=>", result[-1][2], (erow, ecol), linenum)
             del result[-1]

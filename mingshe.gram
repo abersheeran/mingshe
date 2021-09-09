@@ -1134,7 +1134,7 @@ expression (memo):
     | a=disjunction 'if' b=disjunction 'else' c=expression {
         ast.IfExp(body=a, test=b, orelse=c, LOCATIONS)
      }
-    | b=disjunction '?' a=disjunction ':' c=expression {
+    | b=disjunction '?' !'?' a=disjunction ':' c=expression {
         ast.IfExp(body=a, test=b, orelse=c, LOCATIONS)
      }
     | disjunction
@@ -1187,6 +1187,7 @@ named_expression:
 
 disjunction (memo):
     | a=conjunction b=('or' c=conjunction { c })+ { ast.BoolOp(op=ast.Or(), values=[a] + b, LOCATIONS) }
+    | a=disjunction '??' b=conjunction { ast.IfExp(body=a, test=ast.Compare(left=a, ops=[ast.IsNot()], comparators=[ast.Constant(value=None, LOCATIONS)], LOCATIONS), orelse=b, LOCATIONS) }
     | conjunction
 
 conjunction (memo):
@@ -1759,7 +1760,7 @@ invalid_expression[NoReturn]:
     | a=disjunction 'if' b=disjunction !('else'|':') {
         self.store_syntax_error_known_range("expected 'else' after 'if' expression", a, b)
      }
-    | b=disjunction '?' a=disjunction !':' {
+    | b=disjunction '?' !'?' a=disjunction !':' {
         self.store_syntax_error_known_range("expected ':' after '?' expression", b, a)
      }
 invalid_named_expression[NoReturn]:
