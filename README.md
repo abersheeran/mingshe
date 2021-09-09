@@ -15,13 +15,7 @@ pip install mingshe
 Write some code in `main.she`, then run `mingshe ./main.she` to execute code.
 
 ```python
-import time
-
-start_time = time.time_ns()
-for _ in range(10 ** 6):
-    10 |> range |> map(pow(?, 2), ?) |> list
-end_time = time.time_ns()
-print("Time:", (end_time - start_time) / 10 ** 6, "ms")
+10 |> range |> map(pow(?, 2), ?) |> list |> print
 ```
 
 You can also use `mingshe --compile ./main.she` to generate python file.
