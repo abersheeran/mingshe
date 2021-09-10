@@ -332,6 +332,7 @@ class Parser(Parser):
                 if_not_null = ast.Compare(left=result, ops=[ast.IsNot()], comparators=[ast.Constant(value=None, **locations)], **locations)
                 result = ast.IfExp(body=result, test=if_not_null, orelse=item, **locations)
             else:
+                self.check_version((3, 8), "Chained use of ??", None)
                 temporary = ast.NamedExpr(target=ast.Name(id=f'_{i}', ctx=Store, **locations), value=result, **locations)
                 if_not_null = ast.Compare(left=temporary, ops=[ast.IsNot()], comparators=[ast.Constant(value=None, **locations)], **locations)
                 result = ast.IfExp(body=ast.Name(id=f'_{i}', ctx=Load, **locations), test=if_not_null, orelse=item, **locations)
@@ -3344,7 +3345,7 @@ class PythonParser(Parser):
         ):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
-            return self . check_version ( ( 3 , 8 ) , "The '??' operator is" , self . make_nullish_coalescing ( [a] + b , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset ) )
+            return self . make_nullish_coalescing ( [a] + b , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
         self._reset(mark)
         if (
             (conjunction := self.conjunction())
@@ -10017,8 +10018,8 @@ class PythonParser(Parser):
         self._reset(mark)
         return None
 
-    KEYWORDS = ('return', 'in', 'True', 'None', 'from', 'else', 'is', 'class', 'yield', 'for', 'or', 'while', 'def', 'finally', 'raise', 'pass', 'except', 'await', 'del', 'assert', 'and', 'continue', 'global', 'break', 'with', 'try', 'False', 'if', 'nonlocal', 'import', 'async', 'lambda', 'not', 'elif', 'as')
-    SOFT_KEYWORDS = ('case', '_', 'match')
+    KEYWORDS = ('if', 'break', 'raise', 'with', 'global', 'return', 'finally', 'pass', 'def', 'continue', 'is', 'True', 'not', 'or', 'while', 'except', 'assert', 'elif', 'yield', 'class', 'and', 'del', 'None', 'False', 'from', 'async', 'nonlocal', 'lambda', 'try', 'for', 'await', 'else', 'import', 'as', 'in')
+    SOFT_KEYWORDS = ('case', 'match', '_')
 
 
 if __name__ == '__main__':

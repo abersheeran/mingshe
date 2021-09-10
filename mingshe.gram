@@ -325,6 +325,7 @@ class Parser(Parser):
                 if_not_null = ast.Compare(left=result, ops=[ast.IsNot()], comparators=[ast.Constant(value=None, **locations)], **locations)
                 result = ast.IfExp(body=result, test=if_not_null, orelse=item, **locations)
             else:
+                self.check_version((3, 8), "Chained use of ??", None)
                 temporary = ast.NamedExpr(target=ast.Name(id=f'_{i}', ctx=Store, **locations), value=result, **locations)
                 if_not_null = ast.Compare(left=temporary, ops=[ast.IsNot()], comparators=[ast.Constant(value=None, **locations)], **locations)
                 result = ast.IfExp(body=ast.Name(id=f'_{i}', ctx=Load, **locations), test=if_not_null, orelse=item, **locations)
@@ -1198,11 +1199,7 @@ named_expression:
 
 disjunction (memo):
     | a=conjunction b=('or' c=conjunction { c })+ { ast.BoolOp(op=ast.Or(), values=[a] + b, LOCATIONS) }
-    | a=conjunction b=('??' c=conjunction { c })+ { self.check_version(
-            (3, 8), "The '??' operator is",
-            self.make_nullish_coalescing([a] + b, LOCATIONS)
-        )
-     }
+    | a=conjunction b=('??' c=conjunction { c })+ { self.make_nullish_coalescing([a] + b, LOCATIONS) }
     | conjunction
 
 conjunction (memo):
