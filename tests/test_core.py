@@ -56,31 +56,35 @@ import mingshe.core
         # 偏函数
         (
             "f(?)",
-            "(lambda f: (lambda _0, /: f(_0)))(f)",
+            "(lambda f: (lambda _0: f(_0)))(f)",
         ),
         (
             "pow(?, 2)",
-            "(lambda pow: lambda _0, /: pow(_0, 2))(pow)",
+            "(lambda pow: lambda _0: pow(_0, 2))(pow)",
         ),
         (
             "f(a, b=?)",
-            "(lambda _p_0, /, f: lambda _0, /: f(_p_0, b=_0))(a, f)",
+            "(lambda _p_0, f: lambda _0: f(_p_0, b=_0))(a, f)",
         ),
         (
             "f(?, b=0)",
-            "(lambda f: lambda _0, /: f(_0, b=0))(f)",
+            "(lambda f: lambda _0: f(_0, b=0))(f)",
+        ),
+        (
+            "f(?, b=t0)",
+            "(lambda f, b: lambda _0: f(_0, b=b))(f, b=t0)",
         ),
         (
             "f(1, *?)",
-            "(lambda f: lambda _0, /: f(1, *_0))(f)",
+            "(lambda f: lambda _0: f(1, *_0))(f)",
         ),
         (
             "f(a, **?)",
-            "(lambda _p_0, /, f: lambda _0, /: f(_p_0, **_0))(a, f)",
+            "(lambda _p_0, f: lambda _0: f(_p_0, **_0))(a, f)",
         ),
         (
             "f(a, *?, **?)",
-            "(lambda _p_0, /, f: lambda _0, _1, /: f(_p_0, *_0, **_1))(a, f)",
+            "(lambda _p_0, f: lambda _0, _1: f(_p_0, *_0, **_1))(a, f)",
         ),
         # 空值合并
         (
@@ -89,7 +93,7 @@ import mingshe.core
         ),
         (
             "a ?? b ?? c",
-            "(a if a is not None else b) if (a if a is not None else b) is not None else c",
+            "_1 if (_1 := (a if a is not None else b)) is not None else c",
         ),
     ],
 )

@@ -130,7 +130,7 @@ class Parser(Parser):
             return node
         else:
             raise SyntaxError(
-                f"{error_msg} is only supported in Python {min_version} and above."
+                f"{error_msg} only supported in Python {min_version} and above."
             )
 
     def raise_indentation_error(self, msg) -> None:
@@ -257,12 +257,12 @@ class Parser(Parser):
         bind_kwargs = []
         for i in range(len(args)):
             if args[i] == "?":
-                args[i] = ast.Name(id=f"_{q_count}", ctx=ast.Load(), **locations)
+                args[i] = ast.Name(id=f"_{q_count}", ctx=Load, **locations)
                 q_count += 1
             elif isinstance(args[i], ast.Starred) and args[i].value == "?":
                 args[i] = ast.Starred(
-                    value=ast.Name(id=f"_{q_count}", ctx=ast.Load(), **locations),
-                    ctx=ast.Load(),
+                    value=ast.Name(id=f"_{q_count}", ctx=Load, **locations),
+                    ctx=Load,
                     **locations,
                 )
                 q_count += 1
@@ -270,12 +270,12 @@ class Parser(Parser):
                 continue
             else:
                 bind_args.append(args[i])
-                args[i] = ast.Name(id=f"_p_{len(bind_args)-1}", ctx=ast.Load(), **locations)
+                args[i] = ast.Name(id=f"_p_{len(bind_args)-1}", ctx=Load, **locations)
         for i in range(len(kwargs)):
             if kwargs[i].value == "?":
                 kwargs[i] = ast.keyword(
                     arg=kwargs[i].arg,
-                    value=ast.Name(id=f"_{q_count}", ctx=ast.Load(), **locations),
+                    value=ast.Name(id=f"_{q_count}", ctx=Load, **locations),
                     **locations,
                 )
                 q_count += 1
@@ -285,7 +285,7 @@ class Parser(Parser):
                 bind_kwargs.append(kwargs[i])
                 kwargs[i] = ast.keyword(
                     arg=kwargs[i].arg,
-                    value=ast.Name(id=kwargs[i].arg, ctx=ast.Load(), **locations),
+                    value=ast.Name(id=kwargs[i].arg, ctx=Load, **locations),
                     **locations,
                 )
 
@@ -293,8 +293,8 @@ class Parser(Parser):
         if q_count > 0:
             lambda_body = ast.Lambda(
                 args=ast.arguments(
-                    posonlyargs=[ast.arg(arg=f"_{i}", **locations) for i in range(q_count)],
-                    kwonlyargs=[], args=[], defaults=[], vararg=None, kw_defaults=[], kwarg=None,
+                    args=[ast.arg(arg=f"_{i}", **locations) for i in range(q_count)],
+                    posonlyargs=[], kwonlyargs=[], defaults=[], vararg=None, kw_defaults=[], kwarg=None,
                     **locations,
                 ),
                 body=result,
@@ -303,11 +303,10 @@ class Parser(Parser):
             result = ast.Call(
                 func=ast.Lambda(
                     args=ast.arguments(
-                        posonlyargs=[ast.arg(arg=f"_p_{i}", **locations) for i in range(len(bind_args))],
-                        kwonlyargs=[ast.arg(arg=bind_kwargs[i].arg, **locations) for i in range(len(bind_kwargs))],
-                        args=[ast.arg(arg=func.id, **locations)],
-                        kw_defaults=[None for _ in range(len(bind_kwargs))],
-                        defaults=[], vararg=None, kwarg=None,
+                        args=[ast.arg(arg=f"_p_{i}", **locations) for i in range(len(bind_args))]
+                             + [ast.arg(arg=func.id, **locations)]
+                             + [ast.arg(arg=bind_kwargs[i].arg, **locations) for i in range(len(bind_kwargs))],
+                        posonlyargs=[], kwonlyargs=[], kw_defaults=[], defaults=[], vararg=None, kwarg=None,
                         **locations,
                     ),
                     body=lambda_body,
@@ -317,6 +316,18 @@ class Parser(Parser):
                 keywords=bind_kwargs,
                 **locations,
             )
+        return result
+
+    def make_nullish_coalescing(self, array, **locations):
+        result = array[0]
+        for i, item in enumerate(array[1:]):
+            if i == 0:
+                if_not_null = ast.Compare(left=result, ops=[ast.IsNot()], comparators=[ast.Constant(value=None, **locations)], **locations)
+                result = ast.IfExp(body=result, test=if_not_null, orelse=item, **locations)
+            else:
+                temporary = ast.NamedExpr(target=ast.Name(id=f'_{i}', ctx=Store, **locations), value=result, **locations)
+                if_not_null = ast.Compare(left=temporary, ops=[ast.IsNot()], comparators=[ast.Constant(value=None, **locations)], **locations)
+                result = ast.IfExp(body=ast.Name(id=f'_{i}', ctx=Load, **locations), test=if_not_null, orelse=item, **locations)
         return result
 
     def make_arguments(self,
@@ -1187,7 +1198,11 @@ named_expression:
 
 disjunction (memo):
     | a=conjunction b=('or' c=conjunction { c })+ { ast.BoolOp(op=ast.Or(), values=[a] + b, LOCATIONS) }
-    | a=disjunction '??' b=conjunction { ast.IfExp(body=a, test=ast.Compare(left=a, ops=[ast.IsNot()], comparators=[ast.Constant(value=None, LOCATIONS)], LOCATIONS), orelse=b, LOCATIONS) }
+    | a=conjunction b=('??' c=conjunction { c })+ { self.check_version(
+            (3, 8), "The '??' operator is",
+            self.make_nullish_coalescing([a] + b, LOCATIONS)
+        )
+     }
     | conjunction
 
 conjunction (memo):

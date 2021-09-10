@@ -3,7 +3,7 @@ import builtins
 import token
 from io import StringIO
 from tokenize import TokenInfo, generate_tokens
-from typing import Any, Iterable, List
+from typing import Any, Iterable, List, Optional, Tuple
 
 from pegen.tokenizer import Tokenizer
 
@@ -50,14 +50,15 @@ def compile(
     filename: str = "<unknown>",
     verbose_tokenizer: bool = False,
     verbose_parser: bool = False,
+    py_version: Optional[Tuple[int, int]] = None
 ) -> ast.Module:
     tokengen = iter(merge_operators(tokenize(s)))
     tokenizer = Tokenizer(tokengen, verbose=verbose_tokenizer)
-    parser = PythonParser(tokenizer, filename=filename, verbose=verbose_parser)
+    parser = PythonParser(tokenizer, filename=filename, verbose=verbose_parser, py_version=py_version)
     try:
         return parser.parse("file")
     except SyntaxError as syntax_error:
-        if not syntax_error.text:
+        if parser._exception is None and str(syntax_error) == "invalid syntax":
             raise parser.make_syntax_error("unknown syntax error") from None
         else:
             raise

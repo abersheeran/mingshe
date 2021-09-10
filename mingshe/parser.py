@@ -136,7 +136,7 @@ class Parser(Parser):
             return node
         else:
             raise SyntaxError(
-                f"{error_msg} is only supported in Python {min_version} and above."
+                f"{error_msg} only supported in Python {min_version} and above."
             )
 
     def raise_indentation_error(self, msg) -> None:
@@ -264,12 +264,12 @@ class Parser(Parser):
         bind_kwargs = []
         for i in range(len(args)):
             if args[i] == "?":
-                args[i] = ast.Name(id=f"_{q_count}", ctx=ast.Load(), **locations)
+                args[i] = ast.Name(id=f"_{q_count}", ctx=Load, **locations)
                 q_count += 1
             elif isinstance(args[i], ast.Starred) and args[i].value == "?":
                 args[i] = ast.Starred(
-                    value=ast.Name(id=f"_{q_count}", ctx=ast.Load(), **locations),
-                    ctx=ast.Load(),
+                    value=ast.Name(id=f"_{q_count}", ctx=Load, **locations),
+                    ctx=Load,
                     **locations,
                 )
                 q_count += 1
@@ -277,12 +277,12 @@ class Parser(Parser):
                 continue
             else:
                 bind_args.append(args[i])
-                args[i] = ast.Name(id=f"_p_{len(bind_args)-1}", ctx=ast.Load(), **locations)
+                args[i] = ast.Name(id=f"_p_{len(bind_args)-1}", ctx=Load, **locations)
         for i in range(len(kwargs)):
             if kwargs[i].value == "?":
                 kwargs[i] = ast.keyword(
                     arg=kwargs[i].arg,
-                    value=ast.Name(id=f"_{q_count}", ctx=ast.Load(), **locations),
+                    value=ast.Name(id=f"_{q_count}", ctx=Load, **locations),
                     **locations,
                 )
                 q_count += 1
@@ -292,7 +292,7 @@ class Parser(Parser):
                 bind_kwargs.append(kwargs[i])
                 kwargs[i] = ast.keyword(
                     arg=kwargs[i].arg,
-                    value=ast.Name(id=kwargs[i].arg, ctx=ast.Load(), **locations),
+                    value=ast.Name(id=kwargs[i].arg, ctx=Load, **locations),
                     **locations,
                 )
 
@@ -300,8 +300,8 @@ class Parser(Parser):
         if q_count > 0:
             lambda_body = ast.Lambda(
                 args=ast.arguments(
-                    posonlyargs=[ast.arg(arg=f"_{i}", **locations) for i in range(q_count)],
-                    kwonlyargs=[], args=[], defaults=[], vararg=None, kw_defaults=[], kwarg=None,
+                    args=[ast.arg(arg=f"_{i}", **locations) for i in range(q_count)],
+                    posonlyargs=[], kwonlyargs=[], defaults=[], vararg=None, kw_defaults=[], kwarg=None,
                     **locations,
                 ),
                 body=result,
@@ -310,11 +310,10 @@ class Parser(Parser):
             result = ast.Call(
                 func=ast.Lambda(
                     args=ast.arguments(
-                        posonlyargs=[ast.arg(arg=f"_p_{i}", **locations) for i in range(len(bind_args))],
-                        kwonlyargs=[ast.arg(arg=bind_kwargs[i].arg, **locations) for i in range(len(bind_kwargs))],
-                        args=[ast.arg(arg=func.id, **locations)],
-                        kw_defaults=[None for _ in range(len(bind_kwargs))],
-                        defaults=[], vararg=None, kwarg=None,
+                        args=[ast.arg(arg=f"_p_{i}", **locations) for i in range(len(bind_args))]
+                             + [ast.arg(arg=func.id, **locations)]
+                             + [ast.arg(arg=bind_kwargs[i].arg, **locations) for i in range(len(bind_kwargs))],
+                        posonlyargs=[], kwonlyargs=[], kw_defaults=[], defaults=[], vararg=None, kwarg=None,
                         **locations,
                     ),
                     body=lambda_body,
@@ -324,6 +323,18 @@ class Parser(Parser):
                 keywords=bind_kwargs,
                 **locations,
             )
+        return result
+
+    def make_nullish_coalescing(self, array, **locations):
+        result = array[0]
+        for i, item in enumerate(array[1:]):
+            if i == 0:
+                if_not_null = ast.Compare(left=result, ops=[ast.IsNot()], comparators=[ast.Constant(value=None, **locations)], **locations)
+                result = ast.IfExp(body=result, test=if_not_null, orelse=item, **locations)
+            else:
+                temporary = ast.NamedExpr(target=ast.Name(id=f'_{i}', ctx=Store, **locations), value=result, **locations)
+                if_not_null = ast.Compare(left=temporary, ops=[ast.IsNot()], comparators=[ast.Constant(value=None, **locations)], **locations)
+                result = ast.IfExp(body=ast.Name(id=f'_{i}', ctx=Load, **locations), test=if_not_null, orelse=item, **locations)
         return result
 
     def make_arguments(self,
@@ -3311,9 +3322,9 @@ class PythonParser(Parser):
         self._reset(mark)
         return None
 
-    @memoize_left_rec
+    @memoize
     def disjunction(self) -> Optional[Any]:
-        # disjunction: conjunction (('or' conjunction))+ | disjunction '??' conjunction | conjunction
+        # disjunction: conjunction (('or' conjunction))+ | conjunction (('??' conjunction))+ | conjunction
         mark = self._mark()
         tok = self._tokenizer.peek()
         start_lineno, start_col_offset = tok.start
@@ -3327,15 +3338,13 @@ class PythonParser(Parser):
             return ast . BoolOp ( op = ast . Or ( ) , values = [a] + b , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
         self._reset(mark)
         if (
-            (a := self.disjunction())
+            (a := self.conjunction())
             and
-            (literal := self.expect('??'))
-            and
-            (b := self.conjunction())
+            (b := self._loop1_84())
         ):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
-            return ast . IfExp ( body = a , test = ast . Compare ( left = a , ops = [ast . IsNot ( )] , comparators = [ast . Constant ( value = None , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )] , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset ) , orelse = b , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
+            return self . check_version ( ( 3 , 8 ) , "The '??' operator is" , self . make_nullish_coalescing ( [a] + b , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset ) )
         self._reset(mark)
         if (
             (conjunction := self.conjunction())
@@ -3353,7 +3362,7 @@ class PythonParser(Parser):
         if (
             (a := self.inversion())
             and
-            (b := self._loop1_84())
+            (b := self._loop1_85())
         ):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
@@ -3397,7 +3406,7 @@ class PythonParser(Parser):
         if (
             (a := self.pipe_expression())
             and
-            (b := self._loop1_85())
+            (b := self._loop1_86())
         ):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
@@ -4006,7 +4015,7 @@ class PythonParser(Parser):
             return a
         self._reset(mark)
         if (
-            (a := self._gather_86())
+            (a := self._gather_87())
             and
             (opt := self.expect(','),)
         ):
@@ -4029,7 +4038,7 @@ class PythonParser(Parser):
             and
             (b := self.expression(),)
             and
-            (c := self._tmp_88(),)
+            (c := self._tmp_89(),)
         ):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
@@ -4093,23 +4102,23 @@ class PythonParser(Parser):
         if (
             self.positive_lookahead(self.expect, '(')
             and
-            (_tmp_89 := self._tmp_89())
-        ):
-            return _tmp_89
-        self._reset(mark)
-        if (
-            self.positive_lookahead(self.expect, '[')
-            and
             (_tmp_90 := self._tmp_90())
         ):
             return _tmp_90
         self._reset(mark)
         if (
-            self.positive_lookahead(self.expect, '{')
+            self.positive_lookahead(self.expect, '[')
             and
             (_tmp_91 := self._tmp_91())
         ):
             return _tmp_91
+        self._reset(mark)
+        if (
+            self.positive_lookahead(self.expect, '{')
+            and
+            (_tmp_92 := self._tmp_92())
+        ):
+            return _tmp_92
         self._reset(mark)
         if (
             (literal := self.expect('...'))
@@ -4127,7 +4136,7 @@ class PythonParser(Parser):
         if (
             (literal := self.expect('('))
             and
-            (a := self._tmp_92())
+            (a := self._tmp_93())
             and
             (literal_1 := self.expect(')'))
         ):
@@ -4184,9 +4193,9 @@ class PythonParser(Parser):
         if (
             (a := self.lambda_slash_no_default())
             and
-            (b := self._loop0_93(),)
+            (b := self._loop0_94(),)
             and
-            (c := self._loop0_94(),)
+            (c := self._loop0_95(),)
             and
             (d := self.lambda_star_etc(),)
         ):
@@ -4195,23 +4204,23 @@ class PythonParser(Parser):
         if (
             (a := self.lambda_slash_with_default())
             and
-            (b := self._loop0_95(),)
+            (b := self._loop0_96(),)
             and
             (c := self.lambda_star_etc(),)
         ):
             return self . make_arguments ( None , a , None , b , c )
         self._reset(mark)
         if (
-            (a := self._loop1_96())
+            (a := self._loop1_97())
             and
-            (b := self._loop0_97(),)
+            (b := self._loop0_98(),)
             and
             (c := self.lambda_star_etc(),)
         ):
             return self . make_arguments ( None , [] , a , b , c )
         self._reset(mark)
         if (
-            (a := self._loop1_98())
+            (a := self._loop1_99())
             and
             (b := self.lambda_star_etc(),)
         ):
@@ -4229,7 +4238,7 @@ class PythonParser(Parser):
         # lambda_slash_no_default: lambda_param_no_default+ '/' ',' | lambda_param_no_default+ '/' &':'
         mark = self._mark()
         if (
-            (a := self._loop1_99())
+            (a := self._loop1_100())
             and
             (literal := self.expect('/'))
             and
@@ -4238,7 +4247,7 @@ class PythonParser(Parser):
             return [( p , None ) for p in a]
         self._reset(mark)
         if (
-            (a := self._loop1_100())
+            (a := self._loop1_101())
             and
             (literal := self.expect('/'))
             and
@@ -4253,9 +4262,9 @@ class PythonParser(Parser):
         # lambda_slash_with_default: lambda_param_no_default* lambda_param_with_default+ '/' ',' | lambda_param_no_default* lambda_param_with_default+ '/' &':'
         mark = self._mark()
         if (
-            (a := self._loop0_101(),)
+            (a := self._loop0_102(),)
             and
-            (b := self._loop1_102())
+            (b := self._loop1_103())
             and
             (literal := self.expect('/'))
             and
@@ -4264,9 +4273,9 @@ class PythonParser(Parser):
             return ( [( p , None ) for p in a] if a else [] ) + b
         self._reset(mark)
         if (
-            (a := self._loop0_103(),)
+            (a := self._loop0_104(),)
             and
-            (b := self._loop1_104())
+            (b := self._loop1_105())
             and
             (literal := self.expect('/'))
             and
@@ -4285,7 +4294,7 @@ class PythonParser(Parser):
             and
             (a := self.lambda_param_no_default())
             and
-            (b := self._loop0_105(),)
+            (b := self._loop0_106(),)
             and
             (c := self.lambda_kwds(),)
         ):
@@ -4296,7 +4305,7 @@ class PythonParser(Parser):
             and
             (literal_1 := self.expect(','))
             and
-            (b := self._loop1_106())
+            (b := self._loop1_107())
             and
             (c := self.lambda_kwds(),)
         ):
@@ -4415,7 +4424,7 @@ class PythonParser(Parser):
         # strings: STRING+
         mark = self._mark()
         if (
-            (a := self._loop1_107())
+            (a := self._loop1_108())
         ):
             return self . generate_ast_for_string ( a )
         self._reset(mark)
@@ -4449,7 +4458,7 @@ class PythonParser(Parser):
         if (
             (literal := self.expect('('))
             and
-            (a := self._tmp_108(),)
+            (a := self._tmp_109(),)
             and
             (literal_1 := self.expect(')'))
         ):
@@ -4511,7 +4520,7 @@ class PythonParser(Parser):
         # double_starred_kvpairs: ','.double_starred_kvpair+ ','?
         mark = self._mark()
         if (
-            (a := self._gather_109())
+            (a := self._gather_110())
             and
             (opt := self.expect(','),)
         ):
@@ -4557,7 +4566,7 @@ class PythonParser(Parser):
         # for_if_clauses: for_if_clause+
         mark = self._mark()
         if (
-            (a := self._loop1_111())
+            (a := self._loop1_112())
         ):
             return a
         self._reset(mark)
@@ -4581,7 +4590,7 @@ class PythonParser(Parser):
             and
             (b := self.disjunction())
             and
-            (c := self._loop0_112(),)
+            (c := self._loop0_113(),)
         ):
             return self . check_version ( ( 3 , 6 ) , "Async comprehensions are" , ast . comprehension ( target = a , iter = b , ifs = c , is_async = 1 ) )
         self._reset(mark)
@@ -4598,7 +4607,7 @@ class PythonParser(Parser):
             and
             (b := self.disjunction())
             and
-            (c := self._loop0_113(),)
+            (c := self._loop0_114(),)
         ):
             return ast . comprehension ( target = a , iter = b , ifs = c , is_async = 0 )
         self._reset(mark)
@@ -4671,7 +4680,7 @@ class PythonParser(Parser):
         if (
             (literal := self.expect('('))
             and
-            (a := self._tmp_114())
+            (a := self._tmp_115())
             and
             (b := self.for_if_clauses())
             and
@@ -4739,9 +4748,9 @@ class PythonParser(Parser):
         # args: ','.(starred_expression | (assignment_expression | expression !':=') !'=')+ [',' kwargs] | kwargs
         mark = self._mark()
         if (
-            (a := self._gather_115())
+            (a := self._gather_116())
             and
-            (b := self._tmp_117(),)
+            (b := self._tmp_118(),)
         ):
             return ( a + ( [e for e in b if isinstance ( e , ast . Starred )] if b else [] ) , ( [e for e in b if not isinstance ( e , ast . Starred )] if b else [] ) )
         self._reset(mark)
@@ -4757,23 +4766,23 @@ class PythonParser(Parser):
         # kwargs: ','.kwarg_or_starred+ ',' ','.kwarg_or_double_starred+ | ','.kwarg_or_starred+ | ','.kwarg_or_double_starred+
         mark = self._mark()
         if (
-            (a := self._gather_118())
+            (a := self._gather_119())
             and
             (literal := self.expect(','))
             and
-            (b := self._gather_120())
+            (b := self._gather_121())
         ):
             return a + b
         self._reset(mark)
         if (
-            (_gather_122 := self._gather_122())
+            (_gather_123 := self._gather_123())
         ):
-            return _gather_122
+            return _gather_123
         self._reset(mark)
         if (
-            (_gather_124 := self._gather_124())
+            (_gather_125 := self._gather_125())
         ):
-            return _gather_124
+            return _gather_125
         self._reset(mark)
         return None
 
@@ -4881,9 +4890,9 @@ class PythonParser(Parser):
         # partial_args: ",".(partial_placeholder | partial_starred_expression | (assignment_expression | expression !':=') !'=')+ [',' partial_kwargs] | partial_kwargs
         mark = self._mark()
         if (
-            (a := self._gather_126())
+            (a := self._gather_127())
             and
-            (b := self._tmp_128(),)
+            (b := self._tmp_129(),)
         ):
             return ( a + ( [e for e in b if isinstance ( e , ast . Starred )] if b else [] ) , ( [e for e in b if not isinstance ( e , ast . Starred )] if b else [] ) )
         self._reset(mark)
@@ -4899,23 +4908,23 @@ class PythonParser(Parser):
         # partial_kwargs: ','.partial_kwarg_or_starred+ ',' ','.partial_kwarg_or_double_starred+ | ','.partial_kwarg_or_starred+ | ','.partial_kwarg_or_double_starred+
         mark = self._mark()
         if (
-            (a := self._gather_129())
+            (a := self._gather_130())
             and
             (literal := self.expect(','))
             and
-            (b := self._gather_131())
+            (b := self._gather_132())
         ):
             return a + b
         self._reset(mark)
         if (
-            (_gather_133 := self._gather_133())
+            (_gather_134 := self._gather_134())
         ):
-            return _gather_133
+            return _gather_134
         self._reset(mark)
         if (
-            (_gather_135 := self._gather_135())
+            (_gather_136 := self._gather_136())
         ):
-            return _gather_135
+            return _gather_136
         self._reset(mark)
         return None
 
@@ -4928,7 +4937,7 @@ class PythonParser(Parser):
         if (
             (literal := self.expect('*'))
             and
-            (a := self._tmp_137())
+            (a := self._tmp_138())
         ):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
@@ -4952,7 +4961,7 @@ class PythonParser(Parser):
             and
             (literal := self.expect('='))
             and
-            (b := self._tmp_138())
+            (b := self._tmp_139())
         ):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
@@ -4981,7 +4990,7 @@ class PythonParser(Parser):
             and
             (literal := self.expect('='))
             and
-            (b := self._tmp_139())
+            (b := self._tmp_140())
         ):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
@@ -4990,7 +4999,7 @@ class PythonParser(Parser):
         if (
             (literal := self.expect('**'))
             and
-            (a := self._tmp_140())
+            (a := self._tmp_141())
         ):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
@@ -5025,7 +5034,7 @@ class PythonParser(Parser):
         if (
             (a := self.star_target())
             and
-            (b := self._loop0_141(),)
+            (b := self._loop0_142(),)
             and
             (opt := self.expect(','),)
         ):
@@ -5040,7 +5049,7 @@ class PythonParser(Parser):
         # star_targets_list_seq: ','.star_target+ ','?
         mark = self._mark()
         if (
-            (a := self._gather_142())
+            (a := self._gather_143())
             and
             (opt := self.expect(','),)
         ):
@@ -5055,7 +5064,7 @@ class PythonParser(Parser):
         if (
             (a := self.star_target())
             and
-            (b := self._loop1_144())
+            (b := self._loop1_145())
             and
             (opt := self.expect(','),)
         ):
@@ -5079,7 +5088,7 @@ class PythonParser(Parser):
         if (
             (literal := self.expect('*'))
             and
-            (a := self._tmp_145())
+            (a := self._tmp_146())
         ):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
@@ -5354,7 +5363,7 @@ class PythonParser(Parser):
         # del_targets: ','.del_target+ ','?
         mark = self._mark()
         if (
-            (a := self._gather_146())
+            (a := self._gather_147())
             and
             (opt := self.expect(','),)
         ):
@@ -5454,7 +5463,7 @@ class PythonParser(Parser):
         # type_expressions: ','.expression+ ',' '*' expression ',' '**' expression | ','.expression+ ',' '*' expression | ','.expression+ ',' '**' expression | '*' expression ',' '**' expression | '*' expression | '**' expression | ','.expression+
         mark = self._mark()
         if (
-            (a := self._gather_148())
+            (a := self._gather_149())
             and
             (literal := self.expect(','))
             and
@@ -5471,7 +5480,7 @@ class PythonParser(Parser):
             return a + [b , c]
         self._reset(mark)
         if (
-            (a := self._gather_150())
+            (a := self._gather_151())
             and
             (literal := self.expect(','))
             and
@@ -5482,7 +5491,7 @@ class PythonParser(Parser):
             return a + [b]
         self._reset(mark)
         if (
-            (a := self._gather_152())
+            (a := self._gather_153())
             and
             (literal := self.expect(','))
             and
@@ -5520,7 +5529,7 @@ class PythonParser(Parser):
             return [a]
         self._reset(mark)
         if (
-            (a := self._gather_154())
+            (a := self._gather_155())
         ):
             return a
         self._reset(mark)
@@ -5535,7 +5544,7 @@ class PythonParser(Parser):
             and
             (t := self.type_comment())
             and
-            self.positive_lookahead(self._tmp_156, )
+            self.positive_lookahead(self._tmp_157, )
         ):
             return t . string
         self._reset(mark)
@@ -5571,7 +5580,7 @@ class PythonParser(Parser):
             and
             (literal := self.expect(','))
             and
-            (opt := self._tmp_157(),)
+            (opt := self._tmp_158(),)
         ):
             return self . store_syntax_error_known_range ( "Generator expression must be parenthesized" , a , b [- 1] . target )
         self._reset(mark)
@@ -5631,7 +5640,7 @@ class PythonParser(Parser):
             return self . store_syntax_error_known_range ( "invalid syntax. Maybe you meant '==' or ':=' instead of '='?" , a , b )
         self._reset(mark)
         if (
-            self.negative_lookahead(self._tmp_158, )
+            self.negative_lookahead(self._tmp_159, )
             and
             (a := self.expression())
             and
@@ -5714,7 +5723,7 @@ class PythonParser(Parser):
             return None  # pragma: no cover
         self._reset(mark)
         if (
-            self.negative_lookahead(self._tmp_159, )
+            self.negative_lookahead(self._tmp_160, )
             and
             (a := self.disjunction())
             and
@@ -5729,7 +5738,7 @@ class PythonParser(Parser):
             and
             (b := self.disjunction())
             and
-            self.negative_lookahead(self._tmp_160, )
+            self.negative_lookahead(self._tmp_161, )
         ):
             return self . store_syntax_error_known_range ( "expected 'else' after 'if' expression" , a , b )
         self._reset(mark)
@@ -5768,12 +5777,12 @@ class PythonParser(Parser):
             and
             (b := self.bitwise_or())
             and
-            self.negative_lookahead(self._tmp_161, )
+            self.negative_lookahead(self._tmp_162, )
         ):
             return ( None if self . in_recursive_rule else self . store_syntax_error_known_range ( "invalid syntax. Maybe you meant '==' or ':=' instead of '='?" , a , b ) )
         self._reset(mark)
         if (
-            self.negative_lookahead(self._tmp_162, )
+            self.negative_lookahead(self._tmp_163, )
             and
             (a := self.bitwise_or())
             and
@@ -5781,7 +5790,7 @@ class PythonParser(Parser):
             and
             (bitwise_or := self.bitwise_or())
             and
-            self.negative_lookahead(self._tmp_163, )
+            self.negative_lookahead(self._tmp_164, )
         ):
             return ( None if self . in_recursive_rule else self . store_syntax_error_known_range ( f"cannot assign to {self.get_expr_name(a)} here. Maybe you meant '==' instead of '='?" , a , b ) )
         self._reset(mark)
@@ -5805,7 +5814,7 @@ class PythonParser(Parser):
             and
             (literal := self.expect(','))
             and
-            (_loop0_164 := self._loop0_164(),)
+            (_loop0_165 := self._loop0_165(),)
             and
             (literal_1 := self.expect(':'))
             and
@@ -5823,7 +5832,7 @@ class PythonParser(Parser):
             return self . store_syntax_error_known_location ( "illegal target for annotation" , a )
         self._reset(mark)
         if (
-            (_loop0_165 := self._loop0_165(),)
+            (_loop0_166 := self._loop0_166(),)
             and
             (a := self.star_expressions())
             and
@@ -5832,7 +5841,7 @@ class PythonParser(Parser):
             return self . store_syntax_error_known_location ( f"cannot assign to {self.get_expr_name(a)}" , a )
         self._reset(mark)
         if (
-            (_loop0_166 := self._loop0_166(),)
+            (_loop0_167 := self._loop0_167(),)
             and
             (a := self.yield_expr())
             and
@@ -5845,7 +5854,7 @@ class PythonParser(Parser):
             and
             (augassign := self.augassign())
             and
-            (_tmp_167 := self._tmp_167())
+            (_tmp_168 := self._tmp_168())
         ):
             return self . store_syntax_error_known_location ( f"{self.get_expr_name(a)} is an illegal expression for augmented assignment" , a )
         self._reset(mark)
@@ -5907,7 +5916,7 @@ class PythonParser(Parser):
         # invalid_comprehension: ('[' | '(' | '{') starred_expression for_if_clauses | ('[' | '{') star_named_expression ',' star_named_expressions for_if_clauses | ('[' | '{') star_named_expression ',' for_if_clauses
         mark = self._mark()
         if (
-            (_tmp_168 := self._tmp_168())
+            (_tmp_169 := self._tmp_169())
             and
             (a := self.starred_expression())
             and
@@ -5916,7 +5925,7 @@ class PythonParser(Parser):
             return self . raise_syntax_error_known_location ( "iterable unpacking cannot be used in comprehension" , a )
         self._reset(mark)
         if (
-            (_tmp_169 := self._tmp_169())
+            (_tmp_170 := self._tmp_170())
             and
             (a := self.star_named_expression())
             and
@@ -5929,7 +5938,7 @@ class PythonParser(Parser):
             return self . raise_syntax_error_known_range ( "did you forget parentheses around the comprehension target?" , a , b [- 1] )
         self._reset(mark)
         if (
-            (_tmp_170 := self._tmp_170())
+            (_tmp_171 := self._tmp_171())
             and
             (a := self.star_named_expression())
             and
@@ -5965,7 +5974,7 @@ class PythonParser(Parser):
         # invalid_parameters: param_no_default* invalid_parameters_helper param_no_default
         mark = self._mark()
         if (
-            (_loop0_171 := self._loop0_171(),)
+            (_loop0_172 := self._loop0_172(),)
             and
             (invalid_parameters_helper := self.invalid_parameters_helper())
             and
@@ -5985,7 +5994,7 @@ class PythonParser(Parser):
             return [a]
         self._reset(mark)
         if (
-            (a := self._loop1_172())
+            (a := self._loop1_173())
         ):
             return a
         self._reset(mark)
@@ -5996,7 +6005,7 @@ class PythonParser(Parser):
         # invalid_lambda_parameters: lambda_param_no_default* invalid_lambda_parameters_helper lambda_param_no_default
         mark = self._mark()
         if (
-            (_loop0_173 := self._loop0_173(),)
+            (_loop0_174 := self._loop0_174(),)
             and
             (invalid_lambda_parameters_helper := self.invalid_lambda_parameters_helper())
             and
@@ -6016,7 +6025,7 @@ class PythonParser(Parser):
             return [a]
         self._reset(mark)
         if (
-            (a := self._loop1_174())
+            (a := self._loop1_175())
         ):
             return a
         self._reset(mark)
@@ -6029,7 +6038,7 @@ class PythonParser(Parser):
         if (
             (a := self.expect('*'))
             and
-            (_tmp_175 := self._tmp_175())
+            (_tmp_176 := self._tmp_176())
         ):
             return self . store_syntax_error_known_location ( "named arguments must follow bare *" , a )
         self._reset(mark)
@@ -6051,7 +6060,7 @@ class PythonParser(Parser):
         if (
             (literal := self.expect('*'))
             and
-            (_tmp_176 := self._tmp_176())
+            (_tmp_177 := self._tmp_177())
         ):
             return self . raise_syntax_error ( "named arguments must follow bare *" )
         self._reset(mark)
@@ -6087,7 +6096,7 @@ class PythonParser(Parser):
             and
             (a := self.expression())
             and
-            self.positive_lookahead(self._tmp_177, )
+            self.positive_lookahead(self._tmp_178, )
         ):
             return self . raise_syntax_error_known_location ( f"cannot assign to {self.get_expr_name(a)}" , a )
         self._reset(mark)
@@ -6158,7 +6167,7 @@ class PythonParser(Parser):
             and
             (literal := self.expect('with'))
             and
-            (_gather_178 := self._gather_178())
+            (_gather_179 := self._gather_179())
             and
             (forced := self.expect_forced(self.expect(':'), "':'"))
         ):
@@ -6171,7 +6180,7 @@ class PythonParser(Parser):
             and
             (literal_1 := self.expect('('))
             and
-            (_gather_180 := self._gather_180())
+            (_gather_181 := self._gather_181())
             and
             (opt_1 := self.expect(','),)
             and
@@ -6192,7 +6201,7 @@ class PythonParser(Parser):
             and
             (a := self.expect('with'))
             and
-            (_gather_182 := self._gather_182())
+            (_gather_183 := self._gather_183())
             and
             (literal := self.expect(':'))
             and
@@ -6209,7 +6218,7 @@ class PythonParser(Parser):
             and
             (literal := self.expect('('))
             and
-            (_gather_184 := self._gather_184())
+            (_gather_185 := self._gather_185())
             and
             (opt_1 := self.expect(','),)
             and
@@ -6247,7 +6256,7 @@ class PythonParser(Parser):
             and
             (block := self.block())
             and
-            self.negative_lookahead(self._tmp_186, )
+            self.negative_lookahead(self._tmp_187, )
         ):
             return self . raise_syntax_error ( "expected 'except' or 'finally' block" )
         self._reset(mark)
@@ -6266,7 +6275,7 @@ class PythonParser(Parser):
             and
             (expressions := self.expressions())
             and
-            (opt := self._tmp_187(),)
+            (opt := self._tmp_188(),)
             and
             (literal_2 := self.expect(':'))
         ):
@@ -6277,7 +6286,7 @@ class PythonParser(Parser):
             and
             (expression := self.expression())
             and
-            (opt := self._tmp_188(),)
+            (opt := self._tmp_189(),)
             and
             (_newline := self.expect('NEWLINE'))
         ):
@@ -6318,7 +6327,7 @@ class PythonParser(Parser):
             and
             (expression := self.expression())
             and
-            (opt := self._tmp_189(),)
+            (opt := self._tmp_190(),)
             and
             (literal := self.expect(':'))
             and
@@ -6447,7 +6456,7 @@ class PythonParser(Parser):
         # invalid_class_argument_pattern: [positional_patterns ','] keyword_patterns ',' positional_patterns
         mark = self._mark()
         if (
-            (opt := self._tmp_190(),)
+            (opt := self._tmp_191(),)
             and
             (keyword_patterns := self.keyword_patterns())
             and
@@ -6602,7 +6611,7 @@ class PythonParser(Parser):
             and
             (literal_1 := self.expect(')'))
             and
-            (opt_2 := self._tmp_191(),)
+            (opt_2 := self._tmp_192(),)
             and
             (literal_2 := self.expect(':'))
             and
@@ -6623,7 +6632,7 @@ class PythonParser(Parser):
             and
             (name := self.name())
             and
-            (opt := self._tmp_192(),)
+            (opt := self._tmp_193(),)
             and
             (literal := self.expect(':'))
             and
@@ -6640,7 +6649,7 @@ class PythonParser(Parser):
         # invalid_double_starred_kvpairs: ','.double_starred_kvpair+ ',' invalid_kvpair | expression ':' '*' bitwise_or | expression ':' &('}' | ',')
         mark = self._mark()
         if (
-            (_gather_193 := self._gather_193())
+            (_gather_194 := self._gather_194())
             and
             (literal := self.expect(','))
             and
@@ -6664,7 +6673,7 @@ class PythonParser(Parser):
             and
             (a := self.expect(':'))
             and
-            self.positive_lookahead(self._tmp_195, )
+            self.positive_lookahead(self._tmp_196, )
         ):
             return self . store_syntax_error_known_location ( "expression expected after dictionary key and ':'" , a )
         self._reset(mark)
@@ -6907,9 +6916,9 @@ class PythonParser(Parser):
         mark = self._mark()
         children = []
         while (
-            (_tmp_196 := self._tmp_196())
+            (_tmp_197 := self._tmp_197())
         ):
-            children.append(_tmp_196)
+            children.append(_tmp_197)
             mark = self._mark()
         self._reset(mark)
         return children
@@ -7054,9 +7063,9 @@ class PythonParser(Parser):
         mark = self._mark()
         children = []
         while (
-            (_tmp_197 := self._tmp_197())
+            (_tmp_198 := self._tmp_198())
         ):
-            children.append(_tmp_197)
+            children.append(_tmp_198)
             mark = self._mark()
         self._reset(mark)
         return children
@@ -7067,9 +7076,9 @@ class PythonParser(Parser):
         mark = self._mark()
         children = []
         while (
-            (_tmp_198 := self._tmp_198())
+            (_tmp_199 := self._tmp_199())
         ):
-            children.append(_tmp_198)
+            children.append(_tmp_199)
             mark = self._mark()
         self._reset(mark)
         return children
@@ -7852,9 +7861,9 @@ class PythonParser(Parser):
         mark = self._mark()
         children = []
         while (
-            (_tmp_199 := self._tmp_199())
+            (_tmp_200 := self._tmp_200())
         ):
-            children.append(_tmp_199)
+            children.append(_tmp_200)
             mark = self._mark()
         self._reset(mark)
         return children
@@ -7865,9 +7874,9 @@ class PythonParser(Parser):
         mark = self._mark()
         children = []
         while (
-            (_tmp_200 := self._tmp_200())
+            (_tmp_201 := self._tmp_201())
         ):
-            children.append(_tmp_200)
+            children.append(_tmp_201)
             mark = self._mark()
         self._reset(mark)
         return children
@@ -7908,19 +7917,6 @@ class PythonParser(Parser):
         mark = self._mark()
         children = []
         while (
-            (_tmp_201 := self._tmp_201())
-        ):
-            children.append(_tmp_201)
-            mark = self._mark()
-        self._reset(mark)
-        return children
-
-    @memoize
-    def _loop1_84(self) -> Optional[Any]:
-        # _loop1_84: ('and' inversion)
-        mark = self._mark()
-        children = []
-        while (
             (_tmp_202 := self._tmp_202())
         ):
             children.append(_tmp_202)
@@ -7929,8 +7925,34 @@ class PythonParser(Parser):
         return children
 
     @memoize
+    def _loop1_84(self) -> Optional[Any]:
+        # _loop1_84: ('??' conjunction)
+        mark = self._mark()
+        children = []
+        while (
+            (_tmp_203 := self._tmp_203())
+        ):
+            children.append(_tmp_203)
+            mark = self._mark()
+        self._reset(mark)
+        return children
+
+    @memoize
     def _loop1_85(self) -> Optional[Any]:
-        # _loop1_85: compare_op_pipe_expression_pair
+        # _loop1_85: ('and' inversion)
+        mark = self._mark()
+        children = []
+        while (
+            (_tmp_204 := self._tmp_204())
+        ):
+            children.append(_tmp_204)
+            mark = self._mark()
+        self._reset(mark)
+        return children
+
+    @memoize
+    def _loop1_86(self) -> Optional[Any]:
+        # _loop1_86: compare_op_pipe_expression_pair
         mark = self._mark()
         children = []
         while (
@@ -7942,8 +7964,8 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _loop0_87(self) -> Optional[Any]:
-        # _loop0_87: ',' slice
+    def _loop0_88(self) -> Optional[Any]:
+        # _loop0_88: ',' slice
         mark = self._mark()
         children = []
         while (
@@ -7957,14 +7979,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_86(self) -> Optional[Any]:
-        # _gather_86: slice _loop0_87
+    def _gather_87(self) -> Optional[Any]:
+        # _gather_87: slice _loop0_88
         mark = self._mark()
         if (
             (elem := self.slice())
             is not None
             and
-            (seq := self._loop0_87())
+            (seq := self._loop0_88())
             is not None
         ):
             return [elem] + seq
@@ -7972,8 +7994,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_88(self) -> Optional[Any]:
-        # _tmp_88: ':' expression?
+    def _tmp_89(self) -> Optional[Any]:
+        # _tmp_89: ':' expression?
         mark = self._mark()
         if (
             (literal := self.expect(':'))
@@ -7985,8 +8007,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_89(self) -> Optional[Any]:
-        # _tmp_89: tuple | group | genexp
+    def _tmp_90(self) -> Optional[Any]:
+        # _tmp_90: tuple | group | genexp
         mark = self._mark()
         if (
             (tuple := self.tuple())
@@ -8006,8 +8028,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_90(self) -> Optional[Any]:
-        # _tmp_90: list | listcomp
+    def _tmp_91(self) -> Optional[Any]:
+        # _tmp_91: list | listcomp
         mark = self._mark()
         if (
             (list := self.list())
@@ -8022,8 +8044,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_91(self) -> Optional[Any]:
-        # _tmp_91: dict | set | dictcomp | setcomp
+    def _tmp_92(self) -> Optional[Any]:
+        # _tmp_92: dict | set | dictcomp | setcomp
         mark = self._mark()
         if (
             (dict := self.dict())
@@ -8048,8 +8070,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_92(self) -> Optional[Any]:
-        # _tmp_92: yield_expr | named_expression
+    def _tmp_93(self) -> Optional[Any]:
+        # _tmp_93: yield_expr | named_expression
         mark = self._mark()
         if (
             (yield_expr := self.yield_expr())
@@ -8064,27 +8086,14 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_93(self) -> Optional[Any]:
-        # _loop0_93: lambda_param_no_default
+    def _loop0_94(self) -> Optional[Any]:
+        # _loop0_94: lambda_param_no_default
         mark = self._mark()
         children = []
         while (
             (lambda_param_no_default := self.lambda_param_no_default())
         ):
             children.append(lambda_param_no_default)
-            mark = self._mark()
-        self._reset(mark)
-        return children
-
-    @memoize
-    def _loop0_94(self) -> Optional[Any]:
-        # _loop0_94: lambda_param_with_default
-        mark = self._mark()
-        children = []
-        while (
-            (lambda_param_with_default := self.lambda_param_with_default())
-        ):
-            children.append(lambda_param_with_default)
             mark = self._mark()
         self._reset(mark)
         return children
@@ -8103,21 +8112,8 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _loop1_96(self) -> Optional[Any]:
-        # _loop1_96: lambda_param_no_default
-        mark = self._mark()
-        children = []
-        while (
-            (lambda_param_no_default := self.lambda_param_no_default())
-        ):
-            children.append(lambda_param_no_default)
-            mark = self._mark()
-        self._reset(mark)
-        return children
-
-    @memoize
-    def _loop0_97(self) -> Optional[Any]:
-        # _loop0_97: lambda_param_with_default
+    def _loop0_96(self) -> Optional[Any]:
+        # _loop0_96: lambda_param_with_default
         mark = self._mark()
         children = []
         while (
@@ -8129,8 +8125,21 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _loop1_98(self) -> Optional[Any]:
-        # _loop1_98: lambda_param_with_default
+    def _loop1_97(self) -> Optional[Any]:
+        # _loop1_97: lambda_param_no_default
+        mark = self._mark()
+        children = []
+        while (
+            (lambda_param_no_default := self.lambda_param_no_default())
+        ):
+            children.append(lambda_param_no_default)
+            mark = self._mark()
+        self._reset(mark)
+        return children
+
+    @memoize
+    def _loop0_98(self) -> Optional[Any]:
+        # _loop0_98: lambda_param_with_default
         mark = self._mark()
         children = []
         while (
@@ -8143,13 +8152,13 @@ class PythonParser(Parser):
 
     @memoize
     def _loop1_99(self) -> Optional[Any]:
-        # _loop1_99: lambda_param_no_default
+        # _loop1_99: lambda_param_with_default
         mark = self._mark()
         children = []
         while (
-            (lambda_param_no_default := self.lambda_param_no_default())
+            (lambda_param_with_default := self.lambda_param_with_default())
         ):
-            children.append(lambda_param_no_default)
+            children.append(lambda_param_with_default)
             mark = self._mark()
         self._reset(mark)
         return children
@@ -8168,8 +8177,8 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _loop0_101(self) -> Optional[Any]:
-        # _loop0_101: lambda_param_no_default
+    def _loop1_101(self) -> Optional[Any]:
+        # _loop1_101: lambda_param_no_default
         mark = self._mark()
         children = []
         while (
@@ -8181,21 +8190,8 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _loop1_102(self) -> Optional[Any]:
-        # _loop1_102: lambda_param_with_default
-        mark = self._mark()
-        children = []
-        while (
-            (lambda_param_with_default := self.lambda_param_with_default())
-        ):
-            children.append(lambda_param_with_default)
-            mark = self._mark()
-        self._reset(mark)
-        return children
-
-    @memoize
-    def _loop0_103(self) -> Optional[Any]:
-        # _loop0_103: lambda_param_no_default
+    def _loop0_102(self) -> Optional[Any]:
+        # _loop0_102: lambda_param_no_default
         mark = self._mark()
         children = []
         while (
@@ -8207,8 +8203,8 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _loop1_104(self) -> Optional[Any]:
-        # _loop1_104: lambda_param_with_default
+    def _loop1_103(self) -> Optional[Any]:
+        # _loop1_103: lambda_param_with_default
         mark = self._mark()
         children = []
         while (
@@ -8220,21 +8216,34 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _loop0_105(self) -> Optional[Any]:
-        # _loop0_105: lambda_param_maybe_default
+    def _loop0_104(self) -> Optional[Any]:
+        # _loop0_104: lambda_param_no_default
         mark = self._mark()
         children = []
         while (
-            (lambda_param_maybe_default := self.lambda_param_maybe_default())
+            (lambda_param_no_default := self.lambda_param_no_default())
         ):
-            children.append(lambda_param_maybe_default)
+            children.append(lambda_param_no_default)
             mark = self._mark()
         self._reset(mark)
         return children
 
     @memoize
-    def _loop1_106(self) -> Optional[Any]:
-        # _loop1_106: lambda_param_maybe_default
+    def _loop1_105(self) -> Optional[Any]:
+        # _loop1_105: lambda_param_with_default
+        mark = self._mark()
+        children = []
+        while (
+            (lambda_param_with_default := self.lambda_param_with_default())
+        ):
+            children.append(lambda_param_with_default)
+            mark = self._mark()
+        self._reset(mark)
+        return children
+
+    @memoize
+    def _loop0_106(self) -> Optional[Any]:
+        # _loop0_106: lambda_param_maybe_default
         mark = self._mark()
         children = []
         while (
@@ -8247,7 +8256,20 @@ class PythonParser(Parser):
 
     @memoize
     def _loop1_107(self) -> Optional[Any]:
-        # _loop1_107: STRING
+        # _loop1_107: lambda_param_maybe_default
+        mark = self._mark()
+        children = []
+        while (
+            (lambda_param_maybe_default := self.lambda_param_maybe_default())
+        ):
+            children.append(lambda_param_maybe_default)
+            mark = self._mark()
+        self._reset(mark)
+        return children
+
+    @memoize
+    def _loop1_108(self) -> Optional[Any]:
+        # _loop1_108: STRING
         mark = self._mark()
         children = []
         while (
@@ -8259,8 +8281,8 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _tmp_108(self) -> Optional[Any]:
-        # _tmp_108: star_named_expression ',' star_named_expressions?
+    def _tmp_109(self) -> Optional[Any]:
+        # _tmp_109: star_named_expression ',' star_named_expressions?
         mark = self._mark()
         if (
             (y := self.star_named_expression())
@@ -8274,8 +8296,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_110(self) -> Optional[Any]:
-        # _loop0_110: ',' double_starred_kvpair
+    def _loop0_111(self) -> Optional[Any]:
+        # _loop0_111: ',' double_starred_kvpair
         mark = self._mark()
         children = []
         while (
@@ -8289,14 +8311,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_109(self) -> Optional[Any]:
-        # _gather_109: double_starred_kvpair _loop0_110
+    def _gather_110(self) -> Optional[Any]:
+        # _gather_110: double_starred_kvpair _loop0_111
         mark = self._mark()
         if (
             (elem := self.double_starred_kvpair())
             is not None
             and
-            (seq := self._loop0_110())
+            (seq := self._loop0_111())
             is not None
         ):
             return [elem] + seq
@@ -8304,8 +8326,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop1_111(self) -> Optional[Any]:
-        # _loop1_111: for_if_clause
+    def _loop1_112(self) -> Optional[Any]:
+        # _loop1_112: for_if_clause
         mark = self._mark()
         children = []
         while (
@@ -8317,34 +8339,34 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _loop0_112(self) -> Optional[Any]:
-        # _loop0_112: ('if' disjunction)
-        mark = self._mark()
-        children = []
-        while (
-            (_tmp_203 := self._tmp_203())
-        ):
-            children.append(_tmp_203)
-            mark = self._mark()
-        self._reset(mark)
-        return children
-
-    @memoize
     def _loop0_113(self) -> Optional[Any]:
         # _loop0_113: ('if' disjunction)
         mark = self._mark()
         children = []
         while (
-            (_tmp_204 := self._tmp_204())
+            (_tmp_205 := self._tmp_205())
         ):
-            children.append(_tmp_204)
+            children.append(_tmp_205)
             mark = self._mark()
         self._reset(mark)
         return children
 
     @memoize
-    def _tmp_114(self) -> Optional[Any]:
-        # _tmp_114: assignment_expression | expression !':='
+    def _loop0_114(self) -> Optional[Any]:
+        # _loop0_114: ('if' disjunction)
+        mark = self._mark()
+        children = []
+        while (
+            (_tmp_206 := self._tmp_206())
+        ):
+            children.append(_tmp_206)
+            mark = self._mark()
+        self._reset(mark)
+        return children
+
+    @memoize
+    def _tmp_115(self) -> Optional[Any]:
+        # _tmp_115: assignment_expression | expression !':='
         mark = self._mark()
         if (
             (assignment_expression := self.assignment_expression())
@@ -8361,14 +8383,14 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_116(self) -> Optional[Any]:
-        # _loop0_116: ',' (starred_expression | (assignment_expression | expression !':=') !'=')
+    def _loop0_117(self) -> Optional[Any]:
+        # _loop0_117: ',' (starred_expression | (assignment_expression | expression !':=') !'=')
         mark = self._mark()
         children = []
         while (
             (literal := self.expect(','))
             and
-            (elem := self._tmp_205())
+            (elem := self._tmp_207())
         ):
             children.append(elem)
             mark = self._mark()
@@ -8376,14 +8398,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_115(self) -> Optional[Any]:
-        # _gather_115: (starred_expression | (assignment_expression | expression !':=') !'=') _loop0_116
+    def _gather_116(self) -> Optional[Any]:
+        # _gather_116: (starred_expression | (assignment_expression | expression !':=') !'=') _loop0_117
         mark = self._mark()
         if (
-            (elem := self._tmp_205())
+            (elem := self._tmp_207())
             is not None
             and
-            (seq := self._loop0_116())
+            (seq := self._loop0_117())
             is not None
         ):
             return [elem] + seq
@@ -8391,8 +8413,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_117(self) -> Optional[Any]:
-        # _tmp_117: ',' kwargs
+    def _tmp_118(self) -> Optional[Any]:
+        # _tmp_118: ',' kwargs
         mark = self._mark()
         if (
             (literal := self.expect(','))
@@ -8404,8 +8426,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_119(self) -> Optional[Any]:
-        # _loop0_119: ',' kwarg_or_starred
+    def _loop0_120(self) -> Optional[Any]:
+        # _loop0_120: ',' kwarg_or_starred
         mark = self._mark()
         children = []
         while (
@@ -8419,14 +8441,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_118(self) -> Optional[Any]:
-        # _gather_118: kwarg_or_starred _loop0_119
+    def _gather_119(self) -> Optional[Any]:
+        # _gather_119: kwarg_or_starred _loop0_120
         mark = self._mark()
         if (
             (elem := self.kwarg_or_starred())
             is not None
             and
-            (seq := self._loop0_119())
+            (seq := self._loop0_120())
             is not None
         ):
             return [elem] + seq
@@ -8434,8 +8456,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_121(self) -> Optional[Any]:
-        # _loop0_121: ',' kwarg_or_double_starred
+    def _loop0_122(self) -> Optional[Any]:
+        # _loop0_122: ',' kwarg_or_double_starred
         mark = self._mark()
         children = []
         while (
@@ -8449,14 +8471,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_120(self) -> Optional[Any]:
-        # _gather_120: kwarg_or_double_starred _loop0_121
+    def _gather_121(self) -> Optional[Any]:
+        # _gather_121: kwarg_or_double_starred _loop0_122
         mark = self._mark()
         if (
             (elem := self.kwarg_or_double_starred())
             is not None
             and
-            (seq := self._loop0_121())
+            (seq := self._loop0_122())
             is not None
         ):
             return [elem] + seq
@@ -8464,8 +8486,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_123(self) -> Optional[Any]:
-        # _loop0_123: ',' kwarg_or_starred
+    def _loop0_124(self) -> Optional[Any]:
+        # _loop0_124: ',' kwarg_or_starred
         mark = self._mark()
         children = []
         while (
@@ -8479,14 +8501,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_122(self) -> Optional[Any]:
-        # _gather_122: kwarg_or_starred _loop0_123
+    def _gather_123(self) -> Optional[Any]:
+        # _gather_123: kwarg_or_starred _loop0_124
         mark = self._mark()
         if (
             (elem := self.kwarg_or_starred())
             is not None
             and
-            (seq := self._loop0_123())
+            (seq := self._loop0_124())
             is not None
         ):
             return [elem] + seq
@@ -8494,8 +8516,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_125(self) -> Optional[Any]:
-        # _loop0_125: ',' kwarg_or_double_starred
+    def _loop0_126(self) -> Optional[Any]:
+        # _loop0_126: ',' kwarg_or_double_starred
         mark = self._mark()
         children = []
         while (
@@ -8509,14 +8531,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_124(self) -> Optional[Any]:
-        # _gather_124: kwarg_or_double_starred _loop0_125
+    def _gather_125(self) -> Optional[Any]:
+        # _gather_125: kwarg_or_double_starred _loop0_126
         mark = self._mark()
         if (
             (elem := self.kwarg_or_double_starred())
             is not None
             and
-            (seq := self._loop0_125())
+            (seq := self._loop0_126())
             is not None
         ):
             return [elem] + seq
@@ -8524,14 +8546,14 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_127(self) -> Optional[Any]:
-        # _loop0_127: "," (partial_placeholder | partial_starred_expression | (assignment_expression | expression !':=') !'=')
+    def _loop0_128(self) -> Optional[Any]:
+        # _loop0_128: "," (partial_placeholder | partial_starred_expression | (assignment_expression | expression !':=') !'=')
         mark = self._mark()
         children = []
         while (
             (literal := self.expect(","))
             and
-            (elem := self._tmp_206())
+            (elem := self._tmp_208())
         ):
             children.append(elem)
             mark = self._mark()
@@ -8539,14 +8561,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_126(self) -> Optional[Any]:
-        # _gather_126: (partial_placeholder | partial_starred_expression | (assignment_expression | expression !':=') !'=') _loop0_127
+    def _gather_127(self) -> Optional[Any]:
+        # _gather_127: (partial_placeholder | partial_starred_expression | (assignment_expression | expression !':=') !'=') _loop0_128
         mark = self._mark()
         if (
-            (elem := self._tmp_206())
+            (elem := self._tmp_208())
             is not None
             and
-            (seq := self._loop0_127())
+            (seq := self._loop0_128())
             is not None
         ):
             return [elem] + seq
@@ -8554,8 +8576,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_128(self) -> Optional[Any]:
-        # _tmp_128: ',' partial_kwargs
+    def _tmp_129(self) -> Optional[Any]:
+        # _tmp_129: ',' partial_kwargs
         mark = self._mark()
         if (
             (literal := self.expect(','))
@@ -8567,8 +8589,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_130(self) -> Optional[Any]:
-        # _loop0_130: ',' partial_kwarg_or_starred
+    def _loop0_131(self) -> Optional[Any]:
+        # _loop0_131: ',' partial_kwarg_or_starred
         mark = self._mark()
         children = []
         while (
@@ -8582,14 +8604,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_129(self) -> Optional[Any]:
-        # _gather_129: partial_kwarg_or_starred _loop0_130
+    def _gather_130(self) -> Optional[Any]:
+        # _gather_130: partial_kwarg_or_starred _loop0_131
         mark = self._mark()
         if (
             (elem := self.partial_kwarg_or_starred())
             is not None
             and
-            (seq := self._loop0_130())
+            (seq := self._loop0_131())
             is not None
         ):
             return [elem] + seq
@@ -8597,8 +8619,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_132(self) -> Optional[Any]:
-        # _loop0_132: ',' partial_kwarg_or_double_starred
+    def _loop0_133(self) -> Optional[Any]:
+        # _loop0_133: ',' partial_kwarg_or_double_starred
         mark = self._mark()
         children = []
         while (
@@ -8612,14 +8634,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_131(self) -> Optional[Any]:
-        # _gather_131: partial_kwarg_or_double_starred _loop0_132
+    def _gather_132(self) -> Optional[Any]:
+        # _gather_132: partial_kwarg_or_double_starred _loop0_133
         mark = self._mark()
         if (
             (elem := self.partial_kwarg_or_double_starred())
             is not None
             and
-            (seq := self._loop0_132())
+            (seq := self._loop0_133())
             is not None
         ):
             return [elem] + seq
@@ -8627,8 +8649,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_134(self) -> Optional[Any]:
-        # _loop0_134: ',' partial_kwarg_or_starred
+    def _loop0_135(self) -> Optional[Any]:
+        # _loop0_135: ',' partial_kwarg_or_starred
         mark = self._mark()
         children = []
         while (
@@ -8642,14 +8664,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_133(self) -> Optional[Any]:
-        # _gather_133: partial_kwarg_or_starred _loop0_134
+    def _gather_134(self) -> Optional[Any]:
+        # _gather_134: partial_kwarg_or_starred _loop0_135
         mark = self._mark()
         if (
             (elem := self.partial_kwarg_or_starred())
             is not None
             and
-            (seq := self._loop0_134())
+            (seq := self._loop0_135())
             is not None
         ):
             return [elem] + seq
@@ -8657,8 +8679,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_136(self) -> Optional[Any]:
-        # _loop0_136: ',' partial_kwarg_or_double_starred
+    def _loop0_137(self) -> Optional[Any]:
+        # _loop0_137: ',' partial_kwarg_or_double_starred
         mark = self._mark()
         children = []
         while (
@@ -8672,33 +8694,17 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_135(self) -> Optional[Any]:
-        # _gather_135: partial_kwarg_or_double_starred _loop0_136
+    def _gather_136(self) -> Optional[Any]:
+        # _gather_136: partial_kwarg_or_double_starred _loop0_137
         mark = self._mark()
         if (
             (elem := self.partial_kwarg_or_double_starred())
             is not None
             and
-            (seq := self._loop0_136())
+            (seq := self._loop0_137())
             is not None
         ):
             return [elem] + seq
-        self._reset(mark)
-        return None
-
-    @memoize
-    def _tmp_137(self) -> Optional[Any]:
-        # _tmp_137: partial_placeholder | expression
-        mark = self._mark()
-        if (
-            (partial_placeholder := self.partial_placeholder())
-        ):
-            return partial_placeholder
-        self._reset(mark)
-        if (
-            (expression := self.expression())
-        ):
-            return expression
         self._reset(mark)
         return None
 
@@ -8751,21 +8757,37 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_141(self) -> Optional[Any]:
-        # _loop0_141: (',' star_target)
+    def _tmp_141(self) -> Optional[Any]:
+        # _tmp_141: partial_placeholder | expression
+        mark = self._mark()
+        if (
+            (partial_placeholder := self.partial_placeholder())
+        ):
+            return partial_placeholder
+        self._reset(mark)
+        if (
+            (expression := self.expression())
+        ):
+            return expression
+        self._reset(mark)
+        return None
+
+    @memoize
+    def _loop0_142(self) -> Optional[Any]:
+        # _loop0_142: (',' star_target)
         mark = self._mark()
         children = []
         while (
-            (_tmp_207 := self._tmp_207())
+            (_tmp_209 := self._tmp_209())
         ):
-            children.append(_tmp_207)
+            children.append(_tmp_209)
             mark = self._mark()
         self._reset(mark)
         return children
 
     @memoize
-    def _loop0_143(self) -> Optional[Any]:
-        # _loop0_143: ',' star_target
+    def _loop0_144(self) -> Optional[Any]:
+        # _loop0_144: ',' star_target
         mark = self._mark()
         children = []
         while (
@@ -8779,14 +8801,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_142(self) -> Optional[Any]:
-        # _gather_142: star_target _loop0_143
+    def _gather_143(self) -> Optional[Any]:
+        # _gather_143: star_target _loop0_144
         mark = self._mark()
         if (
             (elem := self.star_target())
             is not None
             and
-            (seq := self._loop0_143())
+            (seq := self._loop0_144())
             is not None
         ):
             return [elem] + seq
@@ -8794,21 +8816,21 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop1_144(self) -> Optional[Any]:
-        # _loop1_144: (',' star_target)
+    def _loop1_145(self) -> Optional[Any]:
+        # _loop1_145: (',' star_target)
         mark = self._mark()
         children = []
         while (
-            (_tmp_208 := self._tmp_208())
+            (_tmp_210 := self._tmp_210())
         ):
-            children.append(_tmp_208)
+            children.append(_tmp_210)
             mark = self._mark()
         self._reset(mark)
         return children
 
     @memoize
-    def _tmp_145(self) -> Optional[Any]:
-        # _tmp_145: !'*' star_target
+    def _tmp_146(self) -> Optional[Any]:
+        # _tmp_146: !'*' star_target
         mark = self._mark()
         if (
             self.negative_lookahead(self.expect, '*')
@@ -8820,8 +8842,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_147(self) -> Optional[Any]:
-        # _loop0_147: ',' del_target
+    def _loop0_148(self) -> Optional[Any]:
+        # _loop0_148: ',' del_target
         mark = self._mark()
         children = []
         while (
@@ -8835,14 +8857,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_146(self) -> Optional[Any]:
-        # _gather_146: del_target _loop0_147
+    def _gather_147(self) -> Optional[Any]:
+        # _gather_147: del_target _loop0_148
         mark = self._mark()
         if (
             (elem := self.del_target())
             is not None
             and
-            (seq := self._loop0_147())
+            (seq := self._loop0_148())
             is not None
         ):
             return [elem] + seq
@@ -8850,8 +8872,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_149(self) -> Optional[Any]:
-        # _loop0_149: ',' expression
+    def _loop0_150(self) -> Optional[Any]:
+        # _loop0_150: ',' expression
         mark = self._mark()
         children = []
         while (
@@ -8865,14 +8887,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_148(self) -> Optional[Any]:
-        # _gather_148: expression _loop0_149
+    def _gather_149(self) -> Optional[Any]:
+        # _gather_149: expression _loop0_150
         mark = self._mark()
         if (
             (elem := self.expression())
             is not None
             and
-            (seq := self._loop0_149())
+            (seq := self._loop0_150())
             is not None
         ):
             return [elem] + seq
@@ -8880,8 +8902,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_151(self) -> Optional[Any]:
-        # _loop0_151: ',' expression
+    def _loop0_152(self) -> Optional[Any]:
+        # _loop0_152: ',' expression
         mark = self._mark()
         children = []
         while (
@@ -8895,14 +8917,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_150(self) -> Optional[Any]:
-        # _gather_150: expression _loop0_151
+    def _gather_151(self) -> Optional[Any]:
+        # _gather_151: expression _loop0_152
         mark = self._mark()
         if (
             (elem := self.expression())
             is not None
             and
-            (seq := self._loop0_151())
+            (seq := self._loop0_152())
             is not None
         ):
             return [elem] + seq
@@ -8910,8 +8932,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_153(self) -> Optional[Any]:
-        # _loop0_153: ',' expression
+    def _loop0_154(self) -> Optional[Any]:
+        # _loop0_154: ',' expression
         mark = self._mark()
         children = []
         while (
@@ -8925,14 +8947,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_152(self) -> Optional[Any]:
-        # _gather_152: expression _loop0_153
+    def _gather_153(self) -> Optional[Any]:
+        # _gather_153: expression _loop0_154
         mark = self._mark()
         if (
             (elem := self.expression())
             is not None
             and
-            (seq := self._loop0_153())
+            (seq := self._loop0_154())
             is not None
         ):
             return [elem] + seq
@@ -8940,8 +8962,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_155(self) -> Optional[Any]:
-        # _loop0_155: ',' expression
+    def _loop0_156(self) -> Optional[Any]:
+        # _loop0_156: ',' expression
         mark = self._mark()
         children = []
         while (
@@ -8955,14 +8977,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_154(self) -> Optional[Any]:
-        # _gather_154: expression _loop0_155
+    def _gather_155(self) -> Optional[Any]:
+        # _gather_155: expression _loop0_156
         mark = self._mark()
         if (
             (elem := self.expression())
             is not None
             and
-            (seq := self._loop0_155())
+            (seq := self._loop0_156())
             is not None
         ):
             return [elem] + seq
@@ -8970,8 +8992,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_156(self) -> Optional[Any]:
-        # _tmp_156: NEWLINE INDENT
+    def _tmp_157(self) -> Optional[Any]:
+        # _tmp_157: NEWLINE INDENT
         mark = self._mark()
         if (
             (_newline := self.expect('NEWLINE'))
@@ -8983,8 +9005,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_157(self) -> Optional[Any]:
-        # _tmp_157: args | expression for_if_clauses
+    def _tmp_158(self) -> Optional[Any]:
+        # _tmp_158: args | expression for_if_clauses
         mark = self._mark()
         if (
             (args := self.args())
@@ -9001,8 +9023,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_158(self) -> Optional[Any]:
-        # _tmp_158: NAME '='
+    def _tmp_159(self) -> Optional[Any]:
+        # _tmp_159: NAME '='
         mark = self._mark()
         if (
             (name := self.name())
@@ -9014,8 +9036,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_159(self) -> Optional[Any]:
-        # _tmp_159: NAME STRING | SOFT_KEYWORD
+    def _tmp_160(self) -> Optional[Any]:
+        # _tmp_160: NAME STRING | SOFT_KEYWORD
         mark = self._mark()
         if (
             (name := self.name())
@@ -9032,8 +9054,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_160(self) -> Optional[Any]:
-        # _tmp_160: 'else' | ':'
+    def _tmp_161(self) -> Optional[Any]:
+        # _tmp_161: 'else' | ':'
         mark = self._mark()
         if (
             (literal := self.expect('else'))
@@ -9048,8 +9070,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_161(self) -> Optional[Any]:
-        # _tmp_161: '=' | ':='
+    def _tmp_162(self) -> Optional[Any]:
+        # _tmp_162: '=' | ':='
         mark = self._mark()
         if (
             (literal := self.expect('='))
@@ -9064,8 +9086,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_162(self) -> Optional[Any]:
-        # _tmp_162: list | tuple | genexp | 'True' | 'None' | 'False'
+    def _tmp_163(self) -> Optional[Any]:
+        # _tmp_163: list | tuple | genexp | 'True' | 'None' | 'False'
         mark = self._mark()
         if (
             (list := self.list())
@@ -9100,8 +9122,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_163(self) -> Optional[Any]:
-        # _tmp_163: '=' | ':='
+    def _tmp_164(self) -> Optional[Any]:
+        # _tmp_164: '=' | ':='
         mark = self._mark()
         if (
             (literal := self.expect('='))
@@ -9116,8 +9138,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_164(self) -> Optional[Any]:
-        # _loop0_164: star_named_expressions
+    def _loop0_165(self) -> Optional[Any]:
+        # _loop0_165: star_named_expressions
         mark = self._mark()
         children = []
         while (
@@ -9129,34 +9151,34 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _loop0_165(self) -> Optional[Any]:
-        # _loop0_165: (star_targets '=')
-        mark = self._mark()
-        children = []
-        while (
-            (_tmp_209 := self._tmp_209())
-        ):
-            children.append(_tmp_209)
-            mark = self._mark()
-        self._reset(mark)
-        return children
-
-    @memoize
     def _loop0_166(self) -> Optional[Any]:
         # _loop0_166: (star_targets '=')
         mark = self._mark()
         children = []
         while (
-            (_tmp_210 := self._tmp_210())
+            (_tmp_211 := self._tmp_211())
         ):
-            children.append(_tmp_210)
+            children.append(_tmp_211)
             mark = self._mark()
         self._reset(mark)
         return children
 
     @memoize
-    def _tmp_167(self) -> Optional[Any]:
-        # _tmp_167: yield_expr | star_expressions
+    def _loop0_167(self) -> Optional[Any]:
+        # _loop0_167: (star_targets '=')
+        mark = self._mark()
+        children = []
+        while (
+            (_tmp_212 := self._tmp_212())
+        ):
+            children.append(_tmp_212)
+            mark = self._mark()
+        self._reset(mark)
+        return children
+
+    @memoize
+    def _tmp_168(self) -> Optional[Any]:
+        # _tmp_168: yield_expr | star_expressions
         mark = self._mark()
         if (
             (yield_expr := self.yield_expr())
@@ -9171,8 +9193,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_168(self) -> Optional[Any]:
-        # _tmp_168: '[' | '(' | '{'
+    def _tmp_169(self) -> Optional[Any]:
+        # _tmp_169: '[' | '(' | '{'
         mark = self._mark()
         if (
             (literal := self.expect('['))
@@ -9181,22 +9203,6 @@ class PythonParser(Parser):
         self._reset(mark)
         if (
             (literal := self.expect('('))
-        ):
-            return literal
-        self._reset(mark)
-        if (
-            (literal := self.expect('{'))
-        ):
-            return literal
-        self._reset(mark)
-        return None
-
-    @memoize
-    def _tmp_169(self) -> Optional[Any]:
-        # _tmp_169: '[' | '{'
-        mark = self._mark()
-        if (
-            (literal := self.expect('['))
         ):
             return literal
         self._reset(mark)
@@ -9224,8 +9230,24 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_171(self) -> Optional[Any]:
-        # _loop0_171: param_no_default
+    def _tmp_171(self) -> Optional[Any]:
+        # _tmp_171: '[' | '{'
+        mark = self._mark()
+        if (
+            (literal := self.expect('['))
+        ):
+            return literal
+        self._reset(mark)
+        if (
+            (literal := self.expect('{'))
+        ):
+            return literal
+        self._reset(mark)
+        return None
+
+    @memoize
+    def _loop0_172(self) -> Optional[Any]:
+        # _loop0_172: param_no_default
         mark = self._mark()
         children = []
         while (
@@ -9237,8 +9259,8 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _loop1_172(self) -> Optional[Any]:
-        # _loop1_172: param_with_default
+    def _loop1_173(self) -> Optional[Any]:
+        # _loop1_173: param_with_default
         mark = self._mark()
         children = []
         while (
@@ -9250,8 +9272,8 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _loop0_173(self) -> Optional[Any]:
-        # _loop0_173: lambda_param_no_default
+    def _loop0_174(self) -> Optional[Any]:
+        # _loop0_174: lambda_param_no_default
         mark = self._mark()
         children = []
         while (
@@ -9263,8 +9285,8 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _loop1_174(self) -> Optional[Any]:
-        # _loop1_174: lambda_param_with_default
+    def _loop1_175(self) -> Optional[Any]:
+        # _loop1_175: lambda_param_with_default
         mark = self._mark()
         children = []
         while (
@@ -9276,8 +9298,8 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _tmp_175(self) -> Optional[Any]:
-        # _tmp_175: ')' | ',' (')' | '**')
+    def _tmp_176(self) -> Optional[Any]:
+        # _tmp_176: ')' | ',' (')' | '**')
         mark = self._mark()
         if (
             (literal := self.expect(')'))
@@ -9287,33 +9309,33 @@ class PythonParser(Parser):
         if (
             (literal := self.expect(','))
             and
-            (_tmp_211 := self._tmp_211())
+            (_tmp_213 := self._tmp_213())
         ):
-            return [literal, _tmp_211]
-        self._reset(mark)
-        return None
-
-    @memoize
-    def _tmp_176(self) -> Optional[Any]:
-        # _tmp_176: ':' | ',' (':' | '**')
-        mark = self._mark()
-        if (
-            (literal := self.expect(':'))
-        ):
-            return literal
-        self._reset(mark)
-        if (
-            (literal := self.expect(','))
-            and
-            (_tmp_212 := self._tmp_212())
-        ):
-            return [literal, _tmp_212]
+            return [literal, _tmp_213]
         self._reset(mark)
         return None
 
     @memoize
     def _tmp_177(self) -> Optional[Any]:
-        # _tmp_177: ',' | ')' | ':'
+        # _tmp_177: ':' | ',' (':' | '**')
+        mark = self._mark()
+        if (
+            (literal := self.expect(':'))
+        ):
+            return literal
+        self._reset(mark)
+        if (
+            (literal := self.expect(','))
+            and
+            (_tmp_214 := self._tmp_214())
+        ):
+            return [literal, _tmp_214]
+        self._reset(mark)
+        return None
+
+    @memoize
+    def _tmp_178(self) -> Optional[Any]:
+        # _tmp_178: ',' | ')' | ':'
         mark = self._mark()
         if (
             (literal := self.expect(','))
@@ -9333,68 +9355,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_179(self) -> Optional[Any]:
-        # _loop0_179: ',' (expression ['as' star_target])
-        mark = self._mark()
-        children = []
-        while (
-            (literal := self.expect(','))
-            and
-            (elem := self._tmp_213())
-        ):
-            children.append(elem)
-            mark = self._mark()
-        self._reset(mark)
-        return children
-
-    @memoize
-    def _gather_178(self) -> Optional[Any]:
-        # _gather_178: (expression ['as' star_target]) _loop0_179
-        mark = self._mark()
-        if (
-            (elem := self._tmp_213())
-            is not None
-            and
-            (seq := self._loop0_179())
-            is not None
-        ):
-            return [elem] + seq
-        self._reset(mark)
-        return None
-
-    @memoize
-    def _loop0_181(self) -> Optional[Any]:
-        # _loop0_181: ',' (expressions ['as' star_target])
-        mark = self._mark()
-        children = []
-        while (
-            (literal := self.expect(','))
-            and
-            (elem := self._tmp_214())
-        ):
-            children.append(elem)
-            mark = self._mark()
-        self._reset(mark)
-        return children
-
-    @memoize
-    def _gather_180(self) -> Optional[Any]:
-        # _gather_180: (expressions ['as' star_target]) _loop0_181
-        mark = self._mark()
-        if (
-            (elem := self._tmp_214())
-            is not None
-            and
-            (seq := self._loop0_181())
-            is not None
-        ):
-            return [elem] + seq
-        self._reset(mark)
-        return None
-
-    @memoize
-    def _loop0_183(self) -> Optional[Any]:
-        # _loop0_183: ',' (expression ['as' star_target])
+    def _loop0_180(self) -> Optional[Any]:
+        # _loop0_180: ',' (expression ['as' star_target])
         mark = self._mark()
         children = []
         while (
@@ -9408,14 +9370,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_182(self) -> Optional[Any]:
-        # _gather_182: (expression ['as' star_target]) _loop0_183
+    def _gather_179(self) -> Optional[Any]:
+        # _gather_179: (expression ['as' star_target]) _loop0_180
         mark = self._mark()
         if (
             (elem := self._tmp_215())
             is not None
             and
-            (seq := self._loop0_183())
+            (seq := self._loop0_180())
             is not None
         ):
             return [elem] + seq
@@ -9423,8 +9385,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_185(self) -> Optional[Any]:
-        # _loop0_185: ',' (expressions ['as' star_target])
+    def _loop0_182(self) -> Optional[Any]:
+        # _loop0_182: ',' (expressions ['as' star_target])
         mark = self._mark()
         children = []
         while (
@@ -9438,14 +9400,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_184(self) -> Optional[Any]:
-        # _gather_184: (expressions ['as' star_target]) _loop0_185
+    def _gather_181(self) -> Optional[Any]:
+        # _gather_181: (expressions ['as' star_target]) _loop0_182
         mark = self._mark()
         if (
             (elem := self._tmp_216())
             is not None
             and
-            (seq := self._loop0_185())
+            (seq := self._loop0_182())
             is not None
         ):
             return [elem] + seq
@@ -9453,8 +9415,68 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_186(self) -> Optional[Any]:
-        # _tmp_186: 'except' | 'finally'
+    def _loop0_184(self) -> Optional[Any]:
+        # _loop0_184: ',' (expression ['as' star_target])
+        mark = self._mark()
+        children = []
+        while (
+            (literal := self.expect(','))
+            and
+            (elem := self._tmp_217())
+        ):
+            children.append(elem)
+            mark = self._mark()
+        self._reset(mark)
+        return children
+
+    @memoize
+    def _gather_183(self) -> Optional[Any]:
+        # _gather_183: (expression ['as' star_target]) _loop0_184
+        mark = self._mark()
+        if (
+            (elem := self._tmp_217())
+            is not None
+            and
+            (seq := self._loop0_184())
+            is not None
+        ):
+            return [elem] + seq
+        self._reset(mark)
+        return None
+
+    @memoize
+    def _loop0_186(self) -> Optional[Any]:
+        # _loop0_186: ',' (expressions ['as' star_target])
+        mark = self._mark()
+        children = []
+        while (
+            (literal := self.expect(','))
+            and
+            (elem := self._tmp_218())
+        ):
+            children.append(elem)
+            mark = self._mark()
+        self._reset(mark)
+        return children
+
+    @memoize
+    def _gather_185(self) -> Optional[Any]:
+        # _gather_185: (expressions ['as' star_target]) _loop0_186
+        mark = self._mark()
+        if (
+            (elem := self._tmp_218())
+            is not None
+            and
+            (seq := self._loop0_186())
+            is not None
+        ):
+            return [elem] + seq
+        self._reset(mark)
+        return None
+
+    @memoize
+    def _tmp_187(self) -> Optional[Any]:
+        # _tmp_187: 'except' | 'finally'
         mark = self._mark()
         if (
             (literal := self.expect('except'))
@@ -9465,19 +9487,6 @@ class PythonParser(Parser):
             (literal := self.expect('finally'))
         ):
             return literal
-        self._reset(mark)
-        return None
-
-    @memoize
-    def _tmp_187(self) -> Optional[Any]:
-        # _tmp_187: 'as' NAME
-        mark = self._mark()
-        if (
-            (literal := self.expect('as'))
-            and
-            (name := self.name())
-        ):
-            return [literal, name]
         self._reset(mark)
         return None
 
@@ -9509,7 +9518,20 @@ class PythonParser(Parser):
 
     @memoize
     def _tmp_190(self) -> Optional[Any]:
-        # _tmp_190: positional_patterns ','
+        # _tmp_190: 'as' NAME
+        mark = self._mark()
+        if (
+            (literal := self.expect('as'))
+            and
+            (name := self.name())
+        ):
+            return [literal, name]
+        self._reset(mark)
+        return None
+
+    @memoize
+    def _tmp_191(self) -> Optional[Any]:
+        # _tmp_191: positional_patterns ','
         mark = self._mark()
         if (
             (positional_patterns := self.positional_patterns())
@@ -9521,8 +9543,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_191(self) -> Optional[Any]:
-        # _tmp_191: '->' expression
+    def _tmp_192(self) -> Optional[Any]:
+        # _tmp_192: '->' expression
         mark = self._mark()
         if (
             (literal := self.expect('->'))
@@ -9534,8 +9556,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_192(self) -> Optional[Any]:
-        # _tmp_192: '(' arguments? ')'
+    def _tmp_193(self) -> Optional[Any]:
+        # _tmp_193: '(' arguments? ')'
         mark = self._mark()
         if (
             (literal := self.expect('('))
@@ -9549,8 +9571,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _loop0_194(self) -> Optional[Any]:
-        # _loop0_194: ',' double_starred_kvpair
+    def _loop0_195(self) -> Optional[Any]:
+        # _loop0_195: ',' double_starred_kvpair
         mark = self._mark()
         children = []
         while (
@@ -9564,14 +9586,14 @@ class PythonParser(Parser):
         return children
 
     @memoize
-    def _gather_193(self) -> Optional[Any]:
-        # _gather_193: double_starred_kvpair _loop0_194
+    def _gather_194(self) -> Optional[Any]:
+        # _gather_194: double_starred_kvpair _loop0_195
         mark = self._mark()
         if (
             (elem := self.double_starred_kvpair())
             is not None
             and
-            (seq := self._loop0_194())
+            (seq := self._loop0_195())
             is not None
         ):
             return [elem] + seq
@@ -9579,8 +9601,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_195(self) -> Optional[Any]:
-        # _tmp_195: '}' | ','
+    def _tmp_196(self) -> Optional[Any]:
+        # _tmp_196: '}' | ','
         mark = self._mark()
         if (
             (literal := self.expect('}'))
@@ -9595,8 +9617,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_196(self) -> Optional[Any]:
-        # _tmp_196: star_targets '='
+    def _tmp_197(self) -> Optional[Any]:
+        # _tmp_197: star_targets '='
         mark = self._mark()
         if (
             (z := self.star_targets())
@@ -9604,22 +9626,6 @@ class PythonParser(Parser):
             (literal := self.expect('='))
         ):
             return z
-        self._reset(mark)
-        return None
-
-    @memoize
-    def _tmp_197(self) -> Optional[Any]:
-        # _tmp_197: '.' | '...'
-        mark = self._mark()
-        if (
-            (literal := self.expect('.'))
-        ):
-            return literal
-        self._reset(mark)
-        if (
-            (literal := self.expect('...'))
-        ):
-            return literal
         self._reset(mark)
         return None
 
@@ -9641,7 +9647,23 @@ class PythonParser(Parser):
 
     @memoize
     def _tmp_199(self) -> Optional[Any]:
-        # _tmp_199: ',' expression
+        # _tmp_199: '.' | '...'
+        mark = self._mark()
+        if (
+            (literal := self.expect('.'))
+        ):
+            return literal
+        self._reset(mark)
+        if (
+            (literal := self.expect('...'))
+        ):
+            return literal
+        self._reset(mark)
+        return None
+
+    @memoize
+    def _tmp_200(self) -> Optional[Any]:
+        # _tmp_200: ',' expression
         mark = self._mark()
         if (
             (literal := self.expect(','))
@@ -9653,8 +9675,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_200(self) -> Optional[Any]:
-        # _tmp_200: ',' star_expression
+    def _tmp_201(self) -> Optional[Any]:
+        # _tmp_201: ',' star_expression
         mark = self._mark()
         if (
             (literal := self.expect(','))
@@ -9666,8 +9688,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_201(self) -> Optional[Any]:
-        # _tmp_201: 'or' conjunction
+    def _tmp_202(self) -> Optional[Any]:
+        # _tmp_202: 'or' conjunction
         mark = self._mark()
         if (
             (literal := self.expect('or'))
@@ -9679,8 +9701,21 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_202(self) -> Optional[Any]:
-        # _tmp_202: 'and' inversion
+    def _tmp_203(self) -> Optional[Any]:
+        # _tmp_203: '??' conjunction
+        mark = self._mark()
+        if (
+            (literal := self.expect('??'))
+            and
+            (c := self.conjunction())
+        ):
+            return c
+        self._reset(mark)
+        return None
+
+    @memoize
+    def _tmp_204(self) -> Optional[Any]:
+        # _tmp_204: 'and' inversion
         mark = self._mark()
         if (
             (literal := self.expect('and'))
@@ -9692,34 +9727,34 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_203(self) -> Optional[Any]:
-        # _tmp_203: 'if' disjunction
-        mark = self._mark()
-        if (
-            (literal := self.expect('if'))
-            and
-            (z := self.disjunction())
-        ):
-            return z
-        self._reset(mark)
-        return None
-
-    @memoize
-    def _tmp_204(self) -> Optional[Any]:
-        # _tmp_204: 'if' disjunction
-        mark = self._mark()
-        if (
-            (literal := self.expect('if'))
-            and
-            (z := self.disjunction())
-        ):
-            return z
-        self._reset(mark)
-        return None
-
-    @memoize
     def _tmp_205(self) -> Optional[Any]:
-        # _tmp_205: starred_expression | (assignment_expression | expression !':=') !'='
+        # _tmp_205: 'if' disjunction
+        mark = self._mark()
+        if (
+            (literal := self.expect('if'))
+            and
+            (z := self.disjunction())
+        ):
+            return z
+        self._reset(mark)
+        return None
+
+    @memoize
+    def _tmp_206(self) -> Optional[Any]:
+        # _tmp_206: 'if' disjunction
+        mark = self._mark()
+        if (
+            (literal := self.expect('if'))
+            and
+            (z := self.disjunction())
+        ):
+            return z
+        self._reset(mark)
+        return None
+
+    @memoize
+    def _tmp_207(self) -> Optional[Any]:
+        # _tmp_207: starred_expression | (assignment_expression | expression !':=') !'='
         mark = self._mark()
         if (
             (starred_expression := self.starred_expression())
@@ -9727,17 +9762,17 @@ class PythonParser(Parser):
             return starred_expression
         self._reset(mark)
         if (
-            (_tmp_217 := self._tmp_217())
+            (_tmp_219 := self._tmp_219())
             and
             self.negative_lookahead(self.expect, '=')
         ):
-            return _tmp_217
+            return _tmp_219
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_206(self) -> Optional[Any]:
-        # _tmp_206: partial_placeholder | partial_starred_expression | (assignment_expression | expression !':=') !'='
+    def _tmp_208(self) -> Optional[Any]:
+        # _tmp_208: partial_placeholder | partial_starred_expression | (assignment_expression | expression !':=') !'='
         mark = self._mark()
         if (
             (partial_placeholder := self.partial_placeholder())
@@ -9750,56 +9785,43 @@ class PythonParser(Parser):
             return partial_starred_expression
         self._reset(mark)
         if (
-            (_tmp_218 := self._tmp_218())
+            (_tmp_220 := self._tmp_220())
             and
             self.negative_lookahead(self.expect, '=')
         ):
-            return _tmp_218
-        self._reset(mark)
-        return None
-
-    @memoize
-    def _tmp_207(self) -> Optional[Any]:
-        # _tmp_207: ',' star_target
-        mark = self._mark()
-        if (
-            (literal := self.expect(','))
-            and
-            (c := self.star_target())
-        ):
-            return c
-        self._reset(mark)
-        return None
-
-    @memoize
-    def _tmp_208(self) -> Optional[Any]:
-        # _tmp_208: ',' star_target
-        mark = self._mark()
-        if (
-            (literal := self.expect(','))
-            and
-            (c := self.star_target())
-        ):
-            return c
+            return _tmp_220
         self._reset(mark)
         return None
 
     @memoize
     def _tmp_209(self) -> Optional[Any]:
-        # _tmp_209: star_targets '='
+        # _tmp_209: ',' star_target
         mark = self._mark()
         if (
-            (star_targets := self.star_targets())
+            (literal := self.expect(','))
             and
-            (literal := self.expect('='))
+            (c := self.star_target())
         ):
-            return [star_targets, literal]
+            return c
         self._reset(mark)
         return None
 
     @memoize
     def _tmp_210(self) -> Optional[Any]:
-        # _tmp_210: star_targets '='
+        # _tmp_210: ',' star_target
+        mark = self._mark()
+        if (
+            (literal := self.expect(','))
+            and
+            (c := self.star_target())
+        ):
+            return c
+        self._reset(mark)
+        return None
+
+    @memoize
+    def _tmp_211(self) -> Optional[Any]:
+        # _tmp_211: star_targets '='
         mark = self._mark()
         if (
             (star_targets := self.star_targets())
@@ -9811,8 +9833,21 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_211(self) -> Optional[Any]:
-        # _tmp_211: ')' | '**'
+    def _tmp_212(self) -> Optional[Any]:
+        # _tmp_212: star_targets '='
+        mark = self._mark()
+        if (
+            (star_targets := self.star_targets())
+            and
+            (literal := self.expect('='))
+        ):
+            return [star_targets, literal]
+        self._reset(mark)
+        return None
+
+    @memoize
+    def _tmp_213(self) -> Optional[Any]:
+        # _tmp_213: ')' | '**'
         mark = self._mark()
         if (
             (literal := self.expect(')'))
@@ -9827,8 +9862,8 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_212(self) -> Optional[Any]:
-        # _tmp_212: ':' | '**'
+    def _tmp_214(self) -> Optional[Any]:
+        # _tmp_214: ':' | '**'
         mark = self._mark()
         if (
             (literal := self.expect(':'))
@@ -9839,32 +9874,6 @@ class PythonParser(Parser):
             (literal := self.expect('**'))
         ):
             return literal
-        self._reset(mark)
-        return None
-
-    @memoize
-    def _tmp_213(self) -> Optional[Any]:
-        # _tmp_213: expression ['as' star_target]
-        mark = self._mark()
-        if (
-            (expression := self.expression())
-            and
-            (opt := self._tmp_219(),)
-        ):
-            return [expression, opt]
-        self._reset(mark)
-        return None
-
-    @memoize
-    def _tmp_214(self) -> Optional[Any]:
-        # _tmp_214: expressions ['as' star_target]
-        mark = self._mark()
-        if (
-            (expressions := self.expressions())
-            and
-            (opt := self._tmp_220(),)
-        ):
-            return [expressions, opt]
         self._reset(mark)
         return None
 
@@ -9896,25 +9905,33 @@ class PythonParser(Parser):
 
     @memoize
     def _tmp_217(self) -> Optional[Any]:
-        # _tmp_217: assignment_expression | expression !':='
+        # _tmp_217: expression ['as' star_target]
         mark = self._mark()
-        if (
-            (assignment_expression := self.assignment_expression())
-        ):
-            return assignment_expression
-        self._reset(mark)
         if (
             (expression := self.expression())
             and
-            self.negative_lookahead(self.expect, ':=')
+            (opt := self._tmp_223(),)
         ):
-            return expression
+            return [expression, opt]
         self._reset(mark)
         return None
 
     @memoize
     def _tmp_218(self) -> Optional[Any]:
-        # _tmp_218: assignment_expression | expression !':='
+        # _tmp_218: expressions ['as' star_target]
+        mark = self._mark()
+        if (
+            (expressions := self.expressions())
+            and
+            (opt := self._tmp_224(),)
+        ):
+            return [expressions, opt]
+        self._reset(mark)
+        return None
+
+    @memoize
+    def _tmp_219(self) -> Optional[Any]:
+        # _tmp_219: assignment_expression | expression !':='
         mark = self._mark()
         if (
             (assignment_expression := self.assignment_expression())
@@ -9931,28 +9948,20 @@ class PythonParser(Parser):
         return None
 
     @memoize
-    def _tmp_219(self) -> Optional[Any]:
-        # _tmp_219: 'as' star_target
-        mark = self._mark()
-        if (
-            (literal := self.expect('as'))
-            and
-            (star_target := self.star_target())
-        ):
-            return [literal, star_target]
-        self._reset(mark)
-        return None
-
-    @memoize
     def _tmp_220(self) -> Optional[Any]:
-        # _tmp_220: 'as' star_target
+        # _tmp_220: assignment_expression | expression !':='
         mark = self._mark()
         if (
-            (literal := self.expect('as'))
-            and
-            (star_target := self.star_target())
+            (assignment_expression := self.assignment_expression())
         ):
-            return [literal, star_target]
+            return assignment_expression
+        self._reset(mark)
+        if (
+            (expression := self.expression())
+            and
+            self.negative_lookahead(self.expect, ':=')
+        ):
+            return expression
         self._reset(mark)
         return None
 
@@ -9982,7 +9991,33 @@ class PythonParser(Parser):
         self._reset(mark)
         return None
 
-    KEYWORDS = ('await', 'del', 'nonlocal', 'finally', 'True', 'except', 'pass', 'False', 'try', 'while', 'from', 'import', 'with', 'not', 'global', 'class', 'is', 'or', 'break', 'if', 'else', 'raise', 'None', 'def', 'async', 'assert', 'and', 'for', 'yield', 'lambda', 'return', 'as', 'elif', 'continue', 'in')
+    @memoize
+    def _tmp_223(self) -> Optional[Any]:
+        # _tmp_223: 'as' star_target
+        mark = self._mark()
+        if (
+            (literal := self.expect('as'))
+            and
+            (star_target := self.star_target())
+        ):
+            return [literal, star_target]
+        self._reset(mark)
+        return None
+
+    @memoize
+    def _tmp_224(self) -> Optional[Any]:
+        # _tmp_224: 'as' star_target
+        mark = self._mark()
+        if (
+            (literal := self.expect('as'))
+            and
+            (star_target := self.star_target())
+        ):
+            return [literal, star_target]
+        self._reset(mark)
+        return None
+
+    KEYWORDS = ('return', 'in', 'True', 'None', 'from', 'else', 'is', 'class', 'yield', 'for', 'or', 'while', 'def', 'finally', 'raise', 'pass', 'except', 'await', 'del', 'assert', 'and', 'continue', 'global', 'break', 'with', 'try', 'False', 'if', 'nonlocal', 'import', 'async', 'lambda', 'not', 'elif', 'as')
     SOFT_KEYWORDS = ('case', '_', 'match')
 
 
