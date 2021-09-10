@@ -100,7 +100,7 @@ a or b ?? c    # syntax error
 a or (b ?? c)  # OK
 ```
 
-## Optional chaining
+### Optional chaining
 
 Example:
 
