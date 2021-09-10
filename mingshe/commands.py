@@ -10,10 +10,17 @@ from .core import compile, exec
 
 def main():
     argparser = argparse.ArgumentParser(description=f"MíngShé {__version__}")
-    argparser.add_argument("filepath", type=Path, help="The .she file")
-    argparser.add_argument("--python", help="Python version. e.g. 3.7", default=".".join(map(str, sys.version_info[:2])))
+    argparser.add_argument("file", help="The .she file")
+    argparser.add_argument(
+        "--python",
+        help="Python version. e.g. 3.7",
+        default=".".join(map(str, sys.version_info[:2])),
+    )
     argparser.add_argument(
         "--compile", dest="compile", action="store_true", help="Only compile"
+    )
+    argparser.add_argument(
+        "-c", dest="cmd", action="store_true", help="Run a short command"
     )
     argparser.add_argument(
         "-v",
@@ -30,16 +37,31 @@ def main():
 
     python = tuple(map(int, re.fullmatch(r"(\d+)\.(\d+)", args.python).groups()))
 
+    if args.cmd:
+        mingshe_code = args.file
+        filename = "<stdin>"
+        py_path = sys.stdout
+        py_path.write_text = lambda x, encoding: py_path.write(x)
+    else:
+        _filepath = Path(args.file)
+        mingshe_code = _filepath.read_text(encoding="utf8")
+        filename = str(_filepath.absolute())
+        py_path = _filepath.with_suffix(".py").absolute()
+
     if args.compile:
         ast_obj = compile(
-            args.filepath.read_text(encoding="utf8"),
-            filename=args.filepath,
+            mingshe_code,
+            filename=filename,
             verbose_tokenizer=verbose_tokenizer,
             verbose_parser=verbose_parser,
             py_version=python,
         )
         py_text = ast.unparse(ast_obj)
-        py_path = args.filepath.with_suffix(".py").absolute()
         py_path.write_text(py_text, encoding="utf8")
     else:
-        exec(args.filepath.read_text(encoding="utf8"), filename=args.filepath)
+        exec(
+            mingshe_code,
+            filename=filename,
+            verbose_tokenizer=verbose_tokenizer,
+            verbose_parser=verbose_parser,
+        )
