@@ -99,3 +99,7 @@ a or b ?? c    # syntax error
 (a or b) ?? c  # OK
 a or (b ?? c)  # OK
 ```
+
+## Change log
+
+Read [releases](https://github.com/abersheeran/mingshe/releases) to see the change log.
