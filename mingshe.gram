@@ -331,6 +331,10 @@ class Parser(Parser):
                 result = ast.IfExp(body=ast.Name(id=f'_{i}', ctx=Load, **locations), test=if_not_null, orelse=item, **locations)
         return result
 
+    def make_optional_chaining(self, left, node, **locations):
+        if_null = ast.Compare(left=left, ops=[ast.Is()], comparators=[ast.Constant(value=None, **locations)], **locations)
+        return ast.IfExp(body=ast.Constant(value=None, **locations), test=if_null, orelse=node, **locations)
+
     def make_arguments(self,
         pos_only: Optional[List[Tuple[ast.arg, None]]],
         pos_only_with_default: List[Tuple[ast.arg, Any]],
@@ -1311,6 +1315,19 @@ await_primary (memo):
 
 primary:
     | a=primary '.' b=NAME { ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS) }
+    | a=primary '?' '.' b=NAME '(' c=[arguments] ')' {
+        self.make_optional_chaining(
+            a,
+            ast.Call(
+                func=ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS),
+                args=c[0] if c else [],
+                keywords=c[1] if c else [],
+                LOCATIONS,
+            ),
+            LOCATIONS
+        )
+     }
+    | a=primary '?' '.' b=NAME { self.make_optional_chaining(a, ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS), LOCATIONS) }
     | a=primary b=genexp { ast.Call(func=a, args=[b], keywords=[], LOCATIONS) }
     | a=primary '(' b=[arguments] ')' {
         ast.Call(
@@ -1322,6 +1339,7 @@ primary:
      }
     | a=primary '(' b=partial_arguments ')' { self.make_partial_function(a, b, LOCATIONS) }
     | a=primary '[' b=slices ']' { ast.Subscript(value=a, slice=b, ctx=Load, LOCATIONS) }
+    | a=primary '?' '[' b=slice ']' { self.make_optional_chaining(a, ast.Subscript(value=a, slice=b, ctx=Load, LOCATIONS), LOCATIONS) }
     | atom
 
 slices:

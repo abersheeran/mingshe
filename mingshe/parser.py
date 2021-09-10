@@ -338,6 +338,10 @@ class Parser(Parser):
                 result = ast.IfExp(body=ast.Name(id=f'_{i}', ctx=Load, **locations), test=if_not_null, orelse=item, **locations)
         return result
 
+    def make_optional_chaining(self, left, node, **locations):
+        if_null = ast.Compare(left=left, ops=[ast.Is()], comparators=[ast.Constant(value=None, **locations)], **locations)
+        return ast.IfExp(body=ast.Constant(value=None, **locations), test=if_null, orelse=node, **locations)
+
     def make_arguments(self,
         pos_only: Optional[List[Tuple[ast.arg, None]]],
         pos_only_with_default: List[Tuple[ast.arg, Any]],
@@ -3932,7 +3936,7 @@ class PythonParser(Parser):
 
     @memoize_left_rec
     def primary(self) -> Optional[Any]:
-        # primary: primary '.' NAME | primary genexp | primary '(' arguments? ')' | primary '(' partial_arguments ')' | primary '[' slices ']' | atom
+        # primary: primary '.' NAME | primary '?' '.' NAME '(' arguments? ')' | primary '?' '.' NAME | primary genexp | primary '(' arguments? ')' | primary '(' partial_arguments ')' | primary '[' slices ']' | primary '?' '[' slice ']' | atom
         mark = self._mark()
         tok = self._tokenizer.peek()
         start_lineno, start_col_offset = tok.start
@@ -3946,6 +3950,38 @@ class PythonParser(Parser):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
             return ast . Attribute ( value = a , attr = b . string , ctx = Load , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
+        self._reset(mark)
+        if (
+            (a := self.primary())
+            and
+            (literal := self.expect('?'))
+            and
+            (literal_1 := self.expect('.'))
+            and
+            (b := self.name())
+            and
+            (literal_2 := self.expect('('))
+            and
+            (c := self.arguments(),)
+            and
+            (literal_3 := self.expect(')'))
+        ):
+            tok = self._tokenizer.get_last_non_whitespace_token()
+            end_lineno, end_col_offset = tok.end
+            return self . make_optional_chaining ( a , ast . Call ( func = ast . Attribute ( value = a , attr = b . string , ctx = Load , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset ) , args = c [0] if c else [] , keywords = c [1] if c else [] , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset , ) , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
+        self._reset(mark)
+        if (
+            (a := self.primary())
+            and
+            (literal := self.expect('?'))
+            and
+            (literal_1 := self.expect('.'))
+            and
+            (b := self.name())
+        ):
+            tok = self._tokenizer.get_last_non_whitespace_token()
+            end_lineno, end_col_offset = tok.end
+            return self . make_optional_chaining ( a , ast . Attribute ( value = a , attr = b . string , ctx = Load , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset ) , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
         self._reset(mark)
         if (
             (a := self.primary())
@@ -3994,6 +4030,21 @@ class PythonParser(Parser):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
             return ast . Subscript ( value = a , slice = b , ctx = Load , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
+        self._reset(mark)
+        if (
+            (a := self.primary())
+            and
+            (literal := self.expect('?'))
+            and
+            (literal_1 := self.expect('['))
+            and
+            (b := self.slice())
+            and
+            (literal_2 := self.expect(']'))
+        ):
+            tok = self._tokenizer.get_last_non_whitespace_token()
+            end_lineno, end_col_offset = tok.end
+            return self . make_optional_chaining ( a , ast . Subscript ( value = a , slice = b , ctx = Load , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset ) , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
         self._reset(mark)
         if (
             (atom := self.atom())
@@ -10018,7 +10069,7 @@ class PythonParser(Parser):
         self._reset(mark)
         return None
 
-    KEYWORDS = ('if', 'break', 'raise', 'with', 'global', 'return', 'finally', 'pass', 'def', 'continue', 'is', 'True', 'not', 'or', 'while', 'except', 'assert', 'elif', 'yield', 'class', 'and', 'del', 'None', 'False', 'from', 'async', 'nonlocal', 'lambda', 'try', 'for', 'await', 'else', 'import', 'as', 'in')
+    KEYWORDS = ('yield', 'await', 'raise', 'lambda', 'for', 'is', 'assert', 'continue', 'None', 'return', 'elif', 'finally', 'with', 'class', 'del', 'from', 'or', 'and', 'False', 'except', 'while', 'import', 'nonlocal', 'not', 'as', 'in', 'else', 'global', 'def', 'pass', 'if', 'True', 'break', 'try', 'async')
     SOFT_KEYWORDS = ('case', 'match', '_')
 
 
