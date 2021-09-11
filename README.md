@@ -1,6 +1,6 @@
 # MíngShé
 
-A better [Python](https://www.python.org/) superset language.
+A better [Python](https://www.python.org/) superset language. Use [Pegen](https://github.com/we-like-parsers/pegen) to compile the code.
 
 > “鲜山多金玉，无草木，鲜水出焉，而北流注于伊水。其中多鸣蛇，其状如蛇而四翼，其音如磬，见则其邑大旱”——《山海经》
 
