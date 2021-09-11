@@ -39,7 +39,7 @@ def main():
 
     if args.cmd:
         mingshe_code = args.file
-        filename = "<stdin>"
+        filename = "<string>"
         py_path = sys.stdout
         py_path.write_text = lambda x, encoding: py_path.write(x)
     else:
