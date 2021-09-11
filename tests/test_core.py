@@ -108,6 +108,18 @@ import mingshe.core
             "a?.b()",
             "None if a is None else a.b()",
         ),
+        (
+            "a?.b?.c",
+            "None if (_ := (None if a is None else a.b)) is None else _.c"
+        ),
+        (
+            "a?[b]?[c]",
+            "None if (_ := (None if a is None else a[b])) is None else _[c]"
+        ),
+        (
+            "a?.b()?.c()",
+            "None if (_ := (None if a is None else a.b())) is None else _.c()"
+        ),
     ],
 )
 def test_right_example(raw, result):

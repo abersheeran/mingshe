@@ -332,8 +332,21 @@ class Parser(Parser):
         return result
 
     def make_optional_chaining(self, left, node, **locations):
-        if_null = ast.Compare(left=left, ops=[ast.Is()], comparators=[ast.Constant(value=None, **locations)], **locations)
-        return ast.IfExp(body=ast.Constant(value=None, **locations), test=if_null, orelse=node, **locations)
+        if isinstance(left, ast.IfExp) and getattr(left, "_is_optional_chaining", False):
+            self.check_version((3, 8), "Chained use of ?.", None)
+            temporary = ast.NamedExpr(target=ast.Name(id='_', ctx=Store, **locations), value=left, **locations)
+            if isinstance(node, ast.Call):
+                node.func.value = ast.Name(id='_', ctx=Load, **locations)
+            elif isinstance(node, ast.Attribute):
+                node.value = ast.Name(id='_', ctx=Load, **locations)
+            elif isinstance(node, ast.Subscript):
+                node.value = ast.Name(id='_', ctx=Load, **locations)
+        else:
+            temporary = left
+        if_null = ast.Compare(left=temporary, ops=[ast.Is()], comparators=[ast.Constant(value=None, **locations)], **locations)
+        result = ast.IfExp(body=ast.Constant(value=None, **locations), test=if_null, orelse=node, **locations)
+        result._is_optional_chaining = True
+        return result
 
     def make_arguments(self,
         pos_only: Optional[List[Tuple[ast.arg, None]]],

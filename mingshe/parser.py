@@ -339,8 +339,21 @@ class Parser(Parser):
         return result
 
     def make_optional_chaining(self, left, node, **locations):
-        if_null = ast.Compare(left=left, ops=[ast.Is()], comparators=[ast.Constant(value=None, **locations)], **locations)
-        return ast.IfExp(body=ast.Constant(value=None, **locations), test=if_null, orelse=node, **locations)
+        if isinstance(left, ast.IfExp) and getattr(left, "_is_optional_chaining", False):
+            self.check_version((3, 8), "Chained use of ?.", None)
+            temporary = ast.NamedExpr(target=ast.Name(id='_', ctx=Store, **locations), value=left, **locations)
+            if isinstance(node, ast.Call):
+                node.func.value = ast.Name(id='_', ctx=Load, **locations)
+            elif isinstance(node, ast.Attribute):
+                node.value = ast.Name(id='_', ctx=Load, **locations)
+            elif isinstance(node, ast.Subscript):
+                node.value = ast.Name(id='_', ctx=Load, **locations)
+        else:
+            temporary = left
+        if_null = ast.Compare(left=temporary, ops=[ast.Is()], comparators=[ast.Constant(value=None, **locations)], **locations)
+        result = ast.IfExp(body=ast.Constant(value=None, **locations), test=if_null, orelse=node, **locations)
+        result._is_optional_chaining = True
+        return result
 
     def make_arguments(self,
         pos_only: Optional[List[Tuple[ast.arg, None]]],
@@ -10069,8 +10082,8 @@ class PythonParser(Parser):
         self._reset(mark)
         return None
 
-    KEYWORDS = ('yield', 'await', 'raise', 'lambda', 'for', 'is', 'assert', 'continue', 'None', 'return', 'elif', 'finally', 'with', 'class', 'del', 'from', 'or', 'and', 'False', 'except', 'while', 'import', 'nonlocal', 'not', 'as', 'in', 'else', 'global', 'def', 'pass', 'if', 'True', 'break', 'try', 'async')
-    SOFT_KEYWORDS = ('case', 'match', '_')
+    KEYWORDS = ('pass', 'class', 'def', 'return', 'nonlocal', 'if', 'is', 'not', 'in', 'and', 'continue', 'del', 'global', 'raise', 'else', 'from', 'True', 'False', 'break', 'try', 'while', 'async', 'None', 'await', 'yield', 'lambda', 'elif', 'except', 'import', 'with', 'or', 'finally', 'for', 'assert', 'as')
+    SOFT_KEYWORDS = ('_', 'case', 'match')
 
 
 if __name__ == '__main__':
