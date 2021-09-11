@@ -130,7 +130,7 @@ class Parser(Parser):
             return node
         else:
             raise SyntaxError(
-                f"{error_msg} is only supported in Python {min_version} and above."
+                f"{error_msg} only supported in Python {min_version} and above."
             )
 
     def raise_indentation_error(self, msg) -> None:
@@ -243,6 +243,110 @@ class Parser(Parser):
         if type_comment or sys.version_info < (3, 9):
             arg.type_comment = type_comment
         return arg
+
+    def make_partial_function(self,
+        func: ast.Name,
+        arguments: Tuple[list, list],
+        **locations,
+    ) -> Union[ast.Lambda, ast.Call]:
+        """"Build a partial function"""
+        args = arguments[0] if arguments else []
+        kwargs = arguments[1] if arguments else []
+        q_count = 0
+        bind_args = []
+        bind_kwargs = []
+        for i in range(len(args)):
+            if args[i] == "?":
+                args[i] = ast.Name(id=f"_{q_count}", ctx=Load, **locations)
+                q_count += 1
+            elif isinstance(args[i], ast.Starred) and args[i].value == "?":
+                args[i] = ast.Starred(
+                    value=ast.Name(id=f"_{q_count}", ctx=Load, **locations),
+                    ctx=Load,
+                    **locations,
+                )
+                q_count += 1
+            elif isinstance(args[i], ast.Constant):
+                continue
+            else:
+                bind_args.append(args[i])
+                args[i] = ast.Name(id=f"_p_{len(bind_args)-1}", ctx=Load, **locations)
+        for i in range(len(kwargs)):
+            if kwargs[i].value == "?":
+                kwargs[i] = ast.keyword(
+                    arg=kwargs[i].arg,
+                    value=ast.Name(id=f"_{q_count}", ctx=Load, **locations),
+                    **locations,
+                )
+                q_count += 1
+            elif isinstance(kwargs[i].value, ast.Constant):
+                continue
+            else:
+                bind_kwargs.append(kwargs[i])
+                kwargs[i] = ast.keyword(
+                    arg=kwargs[i].arg,
+                    value=ast.Name(id=kwargs[i].arg, ctx=Load, **locations),
+                    **locations,
+                )
+
+        result = ast.Call(func=func, args=args, keywords=kwargs, **locations)
+        if q_count > 0:
+            lambda_body = ast.Lambda(
+                args=ast.arguments(
+                    args=[ast.arg(arg=f"_{i}", **locations) for i in range(q_count)],
+                    posonlyargs=[], kwonlyargs=[], defaults=[], vararg=None, kw_defaults=[], kwarg=None,
+                    **locations,
+                ),
+                body=result,
+                **locations,
+            )
+            result = ast.Call(
+                func=ast.Lambda(
+                    args=ast.arguments(
+                        args=[ast.arg(arg=f"_p_{i}", **locations) for i in range(len(bind_args))]
+                             + [ast.arg(arg=func.id, **locations)]
+                             + [ast.arg(arg=bind_kwargs[i].arg, **locations) for i in range(len(bind_kwargs))],
+                        posonlyargs=[], kwonlyargs=[], kw_defaults=[], defaults=[], vararg=None, kwarg=None,
+                        **locations,
+                    ),
+                    body=lambda_body,
+                    **locations,
+                ),
+                args=bind_args + [func],
+                keywords=bind_kwargs,
+                **locations,
+            )
+        return result
+
+    def make_nullish_coalescing(self, array, **locations):
+        result = array[0]
+        for i, item in enumerate(array[1:]):
+            if i == 0:
+                if_not_null = ast.Compare(left=result, ops=[ast.IsNot()], comparators=[ast.Constant(value=None, **locations)], **locations)
+                result = ast.IfExp(body=result, test=if_not_null, orelse=item, **locations)
+            else:
+                self.check_version((3, 8), "Chained use of ??", None)
+                temporary = ast.NamedExpr(target=ast.Name(id=f'_{i}', ctx=Store, **locations), value=result, **locations)
+                if_not_null = ast.Compare(left=temporary, ops=[ast.IsNot()], comparators=[ast.Constant(value=None, **locations)], **locations)
+                result = ast.IfExp(body=ast.Name(id=f'_{i}', ctx=Load, **locations), test=if_not_null, orelse=item, **locations)
+        return result
+
+    def make_optional_chaining(self, left, node, **locations):
+        if isinstance(left, ast.IfExp) and getattr(left, "_is_optional_chaining", False):
+            self.check_version((3, 8), "Chained use of ?.", None)
+            temporary = ast.NamedExpr(target=ast.Name(id='_', ctx=Store, **locations), value=left, **locations)
+            if isinstance(node, ast.Call):
+                node.func.value = ast.Name(id='_', ctx=Load, **locations)
+            elif isinstance(node, ast.Attribute):
+                node.value = ast.Name(id='_', ctx=Load, **locations)
+            elif isinstance(node, ast.Subscript):
+                node.value = ast.Name(id='_', ctx=Load, **locations)
+        else:
+            temporary = left
+        if_null = ast.Compare(left=temporary, ops=[ast.Is()], comparators=[ast.Constant(value=None, **locations)], **locations)
+        result = ast.IfExp(body=ast.Constant(value=None, **locations), test=if_null, orelse=node, **locations)
+        result._is_optional_chaining = True
+        return result
 
     def make_arguments(self,
         pos_only: Optional[List[Tuple[ast.arg, None]]],
@@ -1059,7 +1163,7 @@ expression (memo):
     | a=disjunction 'if' b=disjunction 'else' c=expression {
         ast.IfExp(body=a, test=b, orelse=c, LOCATIONS)
      }
-    | b=disjunction '?' a=disjunction ':' c=expression {
+    | b=disjunction '?' !'?' a=disjunction ':' c=expression {
         ast.IfExp(body=a, test=b, orelse=c, LOCATIONS)
      }
     | disjunction
@@ -1112,6 +1216,7 @@ named_expression:
 
 disjunction (memo):
     | a=conjunction b=('or' c=conjunction { c })+ { ast.BoolOp(op=ast.Or(), values=[a] + b, LOCATIONS) }
+    | a=conjunction b=('??' c=conjunction { c })+ { self.make_nullish_coalescing([a] + b, LOCATIONS) }
     | conjunction
 
 conjunction (memo):
@@ -1223,6 +1328,19 @@ await_primary (memo):
 
 primary:
     | a=primary '.' b=NAME { ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS) }
+    | a=primary '?' '.' b=NAME '(' c=[arguments] ')' {
+        self.make_optional_chaining(
+            a,
+            ast.Call(
+                func=ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS),
+                args=c[0] if c else [],
+                keywords=c[1] if c else [],
+                LOCATIONS,
+            ),
+            LOCATIONS
+        )
+     }
+    | a=primary '?' '.' b=NAME { self.make_optional_chaining(a, ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS), LOCATIONS) }
     | a=primary b=genexp { ast.Call(func=a, args=[b], keywords=[], LOCATIONS) }
     | a=primary '(' b=[arguments] ')' {
         ast.Call(
@@ -1232,7 +1350,9 @@ primary:
             LOCATIONS,
         )
      }
+    | a=primary '(' b=partial_arguments ')' { self.make_partial_function(a, b, LOCATIONS) }
     | a=primary '[' b=slices ']' { ast.Subscript(value=a, slice=b, ctx=Load, LOCATIONS) }
+    | a=primary '?' '[' b=slice ']' { self.make_optional_chaining(a, ast.Subscript(value=a, slice=b, ctx=Load, LOCATIONS), LOCATIONS) }
     | atom
 
 slices:
@@ -1472,6 +1592,44 @@ kwarg_or_double_starred:
     | a=NAME '=' b=expression { ast.keyword(arg=a.string, value=b, LOCATIONS) }   # XXX Unreachable
     | '**' a=expression { ast.keyword(arg=None, value=a, LOCATIONS) }
 
+# Partial Call Arguments
+# ----------------------
+
+partial_arguments[Tuple[list, list]] (memo):
+    | a=partial_args [','] &')' { a }
+    | invalid_arguments
+
+partial_args[Tuple[list, list]]:
+    | a=",".(partial_placeholder | partial_starred_expression | ( assignment_expression | expression !':=') !'=') + b=[',' k=partial_kwargs {k}] {
+        (a + ([e for e in b if isinstance(e, ast.Starred)] if b else []),
+         ([e for e in b if not isinstance(e, ast.Starred)] if b else [])
+        )
+    }
+    | a=partial_kwargs {
+        ([e for e in a if isinstance(e, ast.Starred)],
+         [e for e in a if not isinstance(e, ast.Starred)])
+    }
+
+partial_kwargs[list]:
+    | a=','.partial_kwarg_or_starred+ ',' b=','.partial_kwarg_or_double_starred+ { a + b }
+    | ','.partial_kwarg_or_starred+
+    | ','.partial_kwarg_or_double_starred+
+
+partial_starred_expression:
+    | '*' a=(partial_placeholder | expression) { ast.Starred(value=a, ctx=Load, LOCATIONS) }
+
+partial_kwarg_or_starred:
+    | invalid_kwarg
+    | a=NAME '=' b=(partial_placeholder | expression) { ast.keyword(arg=a.string, value=b, LOCATIONS) }
+    | a=partial_starred_expression { a }
+
+partial_kwarg_or_double_starred:
+    | invalid_kwarg
+    | a=NAME '=' b=(partial_placeholder | expression) { ast.keyword(arg=a.string, value=b, LOCATIONS) }   # XXX Unreachable
+    | '**' a=(partial_placeholder | expression) { ast.keyword(arg=None, value=a, LOCATIONS) }
+
+partial_placeholder: '?' { "?" }
+
 # ASSIGNMENT TARGETS
 # ==================
 
@@ -1530,6 +1688,7 @@ t_primary:
             LOCATIONS,
         )
      }
+    | a=t_primary '(' b=partial_arguments ')' &t_lookahead { self.make_partial_function(a, b, LOCATIONS) }
     | a=atom &t_lookahead { a }
 
 t_lookahead: '(' | '[' | '.'
@@ -1627,6 +1786,7 @@ invalid_kwarg[NoReturn]:
 
 expression_without_invalid[ast.AST]:
     | a=disjunction 'if' b=disjunction 'else' c=expression { ast.IfExp(body=b, test=a, orelse=c, LOCATIONS) }
+    | b=disjunction '?' a=disjunction ':' c=expression { ast.IfExp(body=a, test=b, orelse=c, LOCATIONS) }
     | disjunction
     | lambdef
 invalid_legacy_expression:
@@ -1645,6 +1805,9 @@ invalid_expression[NoReturn]:
      }
     | a=disjunction 'if' b=disjunction !('else'|':') {
         self.store_syntax_error_known_range("expected 'else' after 'if' expression", a, b)
+     }
+    | b=disjunction '?' !'?' a=disjunction !':' {
+        self.store_syntax_error_known_range("expected ':' after '?' expression", b, a)
      }
 invalid_named_expression[NoReturn]:
     | a=expression ':=' expression {

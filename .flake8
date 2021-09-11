@@ -1,3 +1,3 @@
 [flake8]
 ignore = W503,E203,E501,E731
-exclude = mingshe/_vendor,mingshe/parser.py
+exclude = mingshe/_vendor,mingshe/parser.py,tests/python_parser
