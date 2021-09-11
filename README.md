@@ -77,7 +77,7 @@ square = pow(?, 2)
 Compile to:
 
 ```python
-(lambda pow: lambda _0, /: pow(_0, 2))(pow)
+(lambda pow: lambda _0: pow(_0, 2))(pow)
 ```
 
 ### Nullish coalescing
@@ -106,6 +106,44 @@ When you need to use `??` with `or`, you need to use parentheses in the outer la
 a or b ?? c    # syntax error
 (a or b) ?? c  # OK
 a or (b ?? c)  # OK
+```
+
+### Optional chaining
+
+Example:
+
+```
+a?.b
+```
+
+Compile to:
+
+```python
+a if a is None else a.b
+```
+
+Example:
+
+```
+a?[b]
+```
+
+Compile to:
+
+```python
+a if a is None else a[b]
+```
+
+Example:
+
+```
+a?.b()
+```
+
+Compile to:
+
+```python
+a if a is None else a.b()
 ```
 
 ## Change log

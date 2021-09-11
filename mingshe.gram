@@ -331,6 +331,23 @@ class Parser(Parser):
                 result = ast.IfExp(body=ast.Name(id=f'_{i}', ctx=Load, **locations), test=if_not_null, orelse=item, **locations)
         return result
 
+    def make_optional_chaining(self, left, node, **locations):
+        if isinstance(left, ast.IfExp) and getattr(left, "_is_optional_chaining", False):
+            self.check_version((3, 8), "Chained use of ?.", None)
+            temporary = ast.NamedExpr(target=ast.Name(id='_', ctx=Store, **locations), value=left, **locations)
+            if isinstance(node, ast.Call):
+                node.func.value = ast.Name(id='_', ctx=Load, **locations)
+            elif isinstance(node, ast.Attribute):
+                node.value = ast.Name(id='_', ctx=Load, **locations)
+            elif isinstance(node, ast.Subscript):
+                node.value = ast.Name(id='_', ctx=Load, **locations)
+        else:
+            temporary = left
+        if_null = ast.Compare(left=temporary, ops=[ast.Is()], comparators=[ast.Constant(value=None, **locations)], **locations)
+        result = ast.IfExp(body=ast.Constant(value=None, **locations), test=if_null, orelse=node, **locations)
+        result._is_optional_chaining = True
+        return result
+
     def make_arguments(self,
         pos_only: Optional[List[Tuple[ast.arg, None]]],
         pos_only_with_default: List[Tuple[ast.arg, Any]],
@@ -1311,6 +1328,19 @@ await_primary (memo):
 
 primary:
     | a=primary '.' b=NAME { ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS) }
+    | a=primary '?' '.' b=NAME '(' c=[arguments] ')' {
+        self.make_optional_chaining(
+            a,
+            ast.Call(
+                func=ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS),
+                args=c[0] if c else [],
+                keywords=c[1] if c else [],
+                LOCATIONS,
+            ),
+            LOCATIONS
+        )
+     }
+    | a=primary '?' '.' b=NAME { self.make_optional_chaining(a, ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS), LOCATIONS) }
     | a=primary b=genexp { ast.Call(func=a, args=[b], keywords=[], LOCATIONS) }
     | a=primary '(' b=[arguments] ')' {
         ast.Call(
@@ -1322,6 +1352,7 @@ primary:
      }
     | a=primary '(' b=partial_arguments ')' { self.make_partial_function(a, b, LOCATIONS) }
     | a=primary '[' b=slices ']' { ast.Subscript(value=a, slice=b, ctx=Load, LOCATIONS) }
+    | a=primary '?' '[' b=slice ']' { self.make_optional_chaining(a, ast.Subscript(value=a, slice=b, ctx=Load, LOCATIONS), LOCATIONS) }
     | atom
 
 slices:

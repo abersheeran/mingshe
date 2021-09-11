@@ -338,6 +338,23 @@ class Parser(Parser):
                 result = ast.IfExp(body=ast.Name(id=f'_{i}', ctx=Load, **locations), test=if_not_null, orelse=item, **locations)
         return result
 
+    def make_optional_chaining(self, left, node, **locations):
+        if isinstance(left, ast.IfExp) and getattr(left, "_is_optional_chaining", False):
+            self.check_version((3, 8), "Chained use of ?.", None)
+            temporary = ast.NamedExpr(target=ast.Name(id='_', ctx=Store, **locations), value=left, **locations)
+            if isinstance(node, ast.Call):
+                node.func.value = ast.Name(id='_', ctx=Load, **locations)
+            elif isinstance(node, ast.Attribute):
+                node.value = ast.Name(id='_', ctx=Load, **locations)
+            elif isinstance(node, ast.Subscript):
+                node.value = ast.Name(id='_', ctx=Load, **locations)
+        else:
+            temporary = left
+        if_null = ast.Compare(left=temporary, ops=[ast.Is()], comparators=[ast.Constant(value=None, **locations)], **locations)
+        result = ast.IfExp(body=ast.Constant(value=None, **locations), test=if_null, orelse=node, **locations)
+        result._is_optional_chaining = True
+        return result
+
     def make_arguments(self,
         pos_only: Optional[List[Tuple[ast.arg, None]]],
         pos_only_with_default: List[Tuple[ast.arg, Any]],
@@ -3932,7 +3949,7 @@ class PythonParser(Parser):
 
     @memoize_left_rec
     def primary(self) -> Optional[Any]:
-        # primary: primary '.' NAME | primary genexp | primary '(' arguments? ')' | primary '(' partial_arguments ')' | primary '[' slices ']' | atom
+        # primary: primary '.' NAME | primary '?' '.' NAME '(' arguments? ')' | primary '?' '.' NAME | primary genexp | primary '(' arguments? ')' | primary '(' partial_arguments ')' | primary '[' slices ']' | primary '?' '[' slice ']' | atom
         mark = self._mark()
         tok = self._tokenizer.peek()
         start_lineno, start_col_offset = tok.start
@@ -3946,6 +3963,38 @@ class PythonParser(Parser):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
             return ast . Attribute ( value = a , attr = b . string , ctx = Load , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
+        self._reset(mark)
+        if (
+            (a := self.primary())
+            and
+            (literal := self.expect('?'))
+            and
+            (literal_1 := self.expect('.'))
+            and
+            (b := self.name())
+            and
+            (literal_2 := self.expect('('))
+            and
+            (c := self.arguments(),)
+            and
+            (literal_3 := self.expect(')'))
+        ):
+            tok = self._tokenizer.get_last_non_whitespace_token()
+            end_lineno, end_col_offset = tok.end
+            return self . make_optional_chaining ( a , ast . Call ( func = ast . Attribute ( value = a , attr = b . string , ctx = Load , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset ) , args = c [0] if c else [] , keywords = c [1] if c else [] , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset , ) , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
+        self._reset(mark)
+        if (
+            (a := self.primary())
+            and
+            (literal := self.expect('?'))
+            and
+            (literal_1 := self.expect('.'))
+            and
+            (b := self.name())
+        ):
+            tok = self._tokenizer.get_last_non_whitespace_token()
+            end_lineno, end_col_offset = tok.end
+            return self . make_optional_chaining ( a , ast . Attribute ( value = a , attr = b . string , ctx = Load , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset ) , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
         self._reset(mark)
         if (
             (a := self.primary())
@@ -3994,6 +4043,21 @@ class PythonParser(Parser):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
             return ast . Subscript ( value = a , slice = b , ctx = Load , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
+        self._reset(mark)
+        if (
+            (a := self.primary())
+            and
+            (literal := self.expect('?'))
+            and
+            (literal_1 := self.expect('['))
+            and
+            (b := self.slice())
+            and
+            (literal_2 := self.expect(']'))
+        ):
+            tok = self._tokenizer.get_last_non_whitespace_token()
+            end_lineno, end_col_offset = tok.end
+            return self . make_optional_chaining ( a , ast . Subscript ( value = a , slice = b , ctx = Load , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset ) , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
         self._reset(mark)
         if (
             (atom := self.atom())
@@ -10018,8 +10082,8 @@ class PythonParser(Parser):
         self._reset(mark)
         return None
 
-    KEYWORDS = ('if', 'break', 'raise', 'with', 'global', 'return', 'finally', 'pass', 'def', 'continue', 'is', 'True', 'not', 'or', 'while', 'except', 'assert', 'elif', 'yield', 'class', 'and', 'del', 'None', 'False', 'from', 'async', 'nonlocal', 'lambda', 'try', 'for', 'await', 'else', 'import', 'as', 'in')
-    SOFT_KEYWORDS = ('case', 'match', '_')
+    KEYWORDS = ('pass', 'class', 'def', 'return', 'nonlocal', 'if', 'is', 'not', 'in', 'and', 'continue', 'del', 'global', 'raise', 'else', 'from', 'True', 'False', 'break', 'try', 'while', 'async', 'None', 'await', 'yield', 'lambda', 'elif', 'except', 'import', 'with', 'or', 'finally', 'for', 'assert', 'as')
+    SOFT_KEYWORDS = ('_', 'case', 'match')
 
 
 if __name__ == '__main__':
