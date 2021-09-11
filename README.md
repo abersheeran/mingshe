@@ -10,7 +10,9 @@ A better [Python](https://www.python.org/) superset language.
 pip install mingshe
 ```
 
-## Example
+## Usage
+
+### As a script
 
 Write some code in `main.she`, then run `mingshe ./main.she` to execute code.
 
@@ -18,7 +20,13 @@ Write some code in `main.she`, then run `mingshe ./main.she` to execute code.
 10 |> range |> map(pow(?, 2), ?) |> list |> print
 ```
 
-You can also use `mingshe --compile ./main.she` to generate python file.
+### Compile to python
+
+You can use `mingshe --compile ./main.she` to generate python file.
+
+### As a module
+
+If you want to use MíngShé's files as a module that be imported, you can add `mingshe.importlib.install_meta(".she")` before `import`. Then you can import module that written by MíngShé in python code or MíngShé code.
 
 ## Extended syntax
 
