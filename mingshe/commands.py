@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .__version__ import __version__
 from .core import compile, exec
+from .importlib import install_meta
 
 
 def main():
@@ -59,6 +60,8 @@ def main():
         py_text = ast.unparse(ast_obj)
         py_path.write_text(py_text, encoding="utf8")
     else:
+        sys.path.insert(0, str(Path(".").absolute()))
+        install_meta(".she")
         exec(
             mingshe_code,
             filename=filename,
