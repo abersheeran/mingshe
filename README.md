@@ -26,7 +26,21 @@ You can use `mingshe --compile ./main.she` to generate python file.
 
 ### As a module
 
-If you want to use MíngShé's files as a module that be imported, you can add `mingshe.importlib.install_meta(".she")` before `import`. Then you can import module that written by MíngShé in python code or MíngShé code.
+You can directly import MíngShé script as a module, as long as the script name ends with `.she`.
+
+Example:
+
+```python
+# lib.she
+def digit_sum(s: str) -> int:
+    return s |> map(int, ?) |> sum
+```
+
+```python
+# main.py
+from lib import digit_sum
+print(digit_sum('123456'))
+```
 
 ## Extended syntax
 

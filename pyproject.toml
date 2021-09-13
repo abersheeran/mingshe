@@ -17,6 +17,8 @@ packages = [
   {include = "mingshe"},
 ]
 
+include = ["aaa_mingshe.pth"]
+
 [tool.poetry.dependencies]
 python = "^3.9"
 
@@ -29,5 +31,5 @@ pytest = "^5.4.3"
 mingshe = 'mingshe.commands:main'
 
 [build-system]
-build-backend = "poetry.masonry.api"
-requires = ["poetry>=0.12"]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

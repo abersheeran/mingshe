@@ -1,0 +1,1 @@
+import mingshe.importlib;mingshe.importlib.install_meta(".she")
