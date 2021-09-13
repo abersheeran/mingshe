@@ -1,5 +1,7 @@
 import ast
 import builtins
+import logging
+import time
 import token
 from io import StringIO
 from tokenize import TokenInfo, generate_tokens
@@ -8,6 +10,8 @@ from typing import Any, Iterable, List, Optional, Tuple
 from pegen.tokenizer import Tokenizer
 
 from .parser import PythonParser
+
+log = logging.getLogger(__name__)
 
 
 def tokenize(s: str) -> Iterable[TokenInfo]:
@@ -52,6 +56,7 @@ def compile(
     verbose_parser: bool = False,
     py_version: Optional[Tuple[int, int]] = None
 ) -> ast.Module:
+    start_time = time.time_ns()
     tokengen = iter(merge_operators(tokenize(s)))
     tokenizer = Tokenizer(tokengen, verbose=verbose_tokenizer)
     parser = PythonParser(tokenizer, filename=filename, verbose=verbose_parser, py_version=py_version)
@@ -62,6 +67,9 @@ def compile(
             raise parser.make_syntax_error("unknown syntax error") from None
         else:
             raise
+    finally:
+        end_time = time.time_ns()
+        log.debug(f"Compile {filename} took {(end_time - start_time) / 1e6:.2f} ms")
 
 
 def exec(
