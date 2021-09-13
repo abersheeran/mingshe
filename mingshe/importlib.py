@@ -49,7 +49,11 @@ class ExtensionMetaFinder(importlib.abc.MetaPathFinder, metaclass=SingletonMetaF
                     log.debug(f"Found module '{module_name}' in {fullpath}")
                     loader = ExtensionModuleLoader(fullpath)
                     return ModuleSpec(module_name, loader, origin=fullpath)
-                elif fullpath.is_dir() and fullpath.name == last_module_name:
+                elif (
+                    fullpath.is_dir()
+                    and fullpath.name == last_module_name
+                    and (fullpath / f"__init__{self.suffix}").exists()
+                ):
                     log.debug(f"Found package '{module_name}' in {fullpath}")
                     loader = ExtensionPackageLoader(fullpath)
                     return ModuleSpec(
@@ -97,7 +101,8 @@ class ExtensionPackageLoader(ExtensionModuleLoader):
 
 def install_meta(suffix: str) -> None:
     finder = ExtensionMetaFinder(suffix)
-    sys.meta_path.insert(0, finder)
+    if sys.meta_path.count(finder) == 0:
+        sys.meta_path.insert(0, finder)
 
 
 def uninstall_meta(suffix: str) -> None:
