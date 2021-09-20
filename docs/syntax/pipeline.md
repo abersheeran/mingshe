@@ -1,15 +1,21 @@
-Example:
+管道运算符允许以一种易读的方式去对函数链式调用，当链式调用多个函数时，使用管道操作符可以改善代码的可读性。本质上来说，管道操作符是单参数函数调用的语法糖，它允许你像这样执行一个调用：
 
 ```
-range(10) |> sum |> print
+10 |> range |> list |> print
 ```
 
-Compile to:
+使用传统语法来写，等效的代码是：
 
 ```python
-print(sum(range(10)))
+print(list(range(10)))
 ```
 
-## Priority
+## 语法
 
-The priority of `|>` is lower than `|` and higher than comparison operations (`in`, `not in`, `is`, `is not`, `<`, `<=`, `>`, `>=`, `!=`, `==`).
+```
+arg |> function
+```
+
+## 优先级
+
+`|>` 的优先级低于 `|`，高于比较运算符（`in`, `not in`, `is`, `is not`, `<`, `<=`, `>`, `>=`, `!=`, `==`）。
