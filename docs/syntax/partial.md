@@ -1,49 +1,24 @@
-Example:
+偏函数操作符可以让你通过绑定部分参数快速创建一个新的函数。与标准库的 `functools.partial` 相比，它更灵活，更强大。
+
+## 语法
 
 ```
-square = pow(?, 2)
-```
+f(?, 2)
 
-Compile to:
+f(?, ?, 3, ?)
 
-```python
-(lambda pow: lambda _0: pow(_0, 2))(pow)
-```
-
-## Keyword
-
-```
 f(a, b=?)
+
+f(*?, b=10)
+
+f(name="Aber", **?)
 ```
 
-Complie to:
+!!! tip ""
+    每一个 `?` 都意味着为生成的函数增加一个位置参数。
 
-```python
-(lambda _p_0, f: lambda _0: f(_p_0, b=_0))(a, f)
-```
+## 使用技巧
 
-## Multiple arguments
+当你需要传递一个序列，但却只想使用管道（`|>`）传递一个参数时，请使用 `*?`。
 
-Positional arguments:
-
-```
-f(1, *?)
-```
-
-Compile to:
-
-```python
-(lambda f: lambda _0: f(1, *_0))(f)
-```
-
-Keyword arguments:
-
-```
-f(a, **?)
-```
-
-Compile to:
-
-```python
-(lambda _p_0, f: lambda _0: f(_p_0, **_0))(a, f)
-```
+试试看 `("hello", "world") |> print(?)` 和 `("hello", "world") |> print(*?)` 的区别。

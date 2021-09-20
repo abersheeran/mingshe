@@ -17,21 +17,15 @@ pip install mingshe
 
 ### As a script
 
-Write some code in `main.she`, then run `mingshe ./main.she` to execute code.
+Write the following code to `hello.she`, and then run `mingshe ./hello.she`.
 
-```python
-10 |> range |> map(pow(?, 2), ?) |> list |> print
+```mingshe
+"hello world" |> print
 ```
-
-### Compile to python
-
-You can use `mingshe --compile ./main.she` to generate python file.
 
 ### As a module
 
-You can directly import MíngShé script as a module, as long as the script name ends with `.she`.
-
-Example:
+Just like use a python module, you can use a mingshe module.
 
 ```python
 # lib.she
@@ -42,8 +36,13 @@ def digit_sum(s: str) -> int:
 ```python
 # main.py
 from lib import digit_sum
+
 print(digit_sum('123456'))
 ```
+
+### Compile to python
+
+Use `mingshe --compile ...` to compile to python.
 
 ## Change log
 

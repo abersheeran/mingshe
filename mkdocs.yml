@@ -31,6 +31,7 @@ theme:
 
 nav:
   - 介绍: index.md
+  - 用法: usage.md
   - 语法:
     - 管道: syntax/pipeline.md
     - 条件运算: syntax/conditional.md
@@ -56,6 +57,7 @@ plugins:
       nav_translations:
         en:
           介绍: Introduction
+          用法: Usage
           语法: Syntax
           管道: Pipeline
           条件运算: Conditional

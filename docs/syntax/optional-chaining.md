@@ -1,46 +1,26 @@
-Example:
+可选链操作符与原始操作符的区别仅在于 `obj` 为空值（`None`）时，可选链操作符会返回 `None`，而原始操作符会抛出异常。
+
+当尝试访问可能不存在的对象属性时，可选链操作符将会使表达式更短、更简明。
+
+## 语法
 
 ```
-a?.b
+obj?.attr
+
+obj?[key]
+
+obj?.method()
 ```
 
-Compile to:
+## 真实代码的示例
 
 ```python
-None if a is None else a.b
-```
+import socket
 
-Example:
-
-```
-a?[b]
-```
-
-Compile to:
-
-```python
-None if a is None else a[b]
-```
-
-Example:
-
-```
-a?.b()
-```
-
-Compile to:
-
-```python
-None if a is None else a.b()
-```
-
-## Examples in real world
-
-```python
-file = None
+sock = None
 try:
-    file = open(filepath)
+    sock = socket.create_connection(('www.python.org', 80))
     ...
 finally:
-    file?.close()
+    sock?.close()
 ```
