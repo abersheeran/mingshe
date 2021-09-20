@@ -19,8 +19,8 @@ repository = "https://github.com/abersheeran/mingshe"
 [project.scripts]
 mingshe = "mingshe.commands:main"
 
-
 [project.optional-dependencies]
+
 [tool.pdm]
 includes = ["mingshe", "aaa_mingshe.pth"]
 
@@ -28,14 +28,13 @@ includes = ["mingshe", "aaa_mingshe.pth"]
 dev = [
   "flake8",
 ]
-
+doc = [
+  "mkdocs[i18n]~=1.2",
+  "mkdocs-material~=7.2",
+  "mkdocs-static-i18n~=0.19",
+]
 test = [
   "pytest<6.0.0,>=5.4.3",
-]
-doc = [
-    "mkdocs[i18n]~=1.2",
-    "mkdocs-material~=7.2",
-    "mkdocs-static-i18n~=0.19",
 ]
 
 [build-system]
