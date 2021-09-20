@@ -10,6 +10,6 @@ Compile to:
 b if a else c
 ```
 
-### Priority
+## Priority
 
 `a ? b: c` has the same priority as `b if a else c`.

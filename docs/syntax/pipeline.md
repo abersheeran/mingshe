@@ -10,6 +10,6 @@ Compile to:
 print(sum(range(10)))
 ```
 
-### Priority
+## Priority
 
 The priority of `|>` is lower than `|` and higher than comparison operations (`in`, `not in`, `is`, `is not`, `<`, `<=`, `>`, `>=`, `!=`, `==`).

@@ -10,11 +10,11 @@ Compile to:
 a if a is not None else b
 ```
 
-### Priority
+## Priority
 
 `??` has the same priority as `or`.
 
-### Note
+## Note
 
 When you need to use `??` with `or`, you need to use parentheses in the outer layer, otherwise it will cause a syntax error.
 
