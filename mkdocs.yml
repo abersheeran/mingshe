@@ -1,0 +1,52 @@
+site_name: MíngShé
+site_description: A better Python superset language.
+
+repo_name: MíngShé
+repo_url: https://github.com/abersheeran/mingshe
+edit_uri: "https://github.com/abersheeran/mingshe/tree/master/docs/"
+
+use_directory_urls: true
+
+theme:
+  name: "material"
+  language: "zh"
+  palette:
+    accent: teal
+  font:
+    code: Fira Code
+  icon:
+    admonition:
+      note: octicons/tag-16
+      abstract: octicons/checklist-16
+      info: octicons/info-16
+      tip: octicons/squirrel-16
+      success: octicons/check-16
+      question: octicons/question-16
+      warning: octicons/alert-16
+      failure: octicons/x-circle-16
+      danger: octicons/zap-16
+      bug: octicons/bug-16
+      example: octicons/beaker-16
+      quote: octicons/quote-16
+
+nav:
+  - 介绍: index.md
+
+markdown_extensions:
+  - admonition
+  - extra
+  - pymdownx.highlight:
+      linenums: true
+  - pymdownx.superfences
+  - pymdownx.details
+
+plugins:
+  - search
+  - i18n:
+      default_language: zh
+      languages:
+        zh: 中文
+        en: English
+      nav_translations:
+        en:
+          介绍: Introduction
