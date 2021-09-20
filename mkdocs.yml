@@ -31,6 +31,12 @@ theme:
 
 nav:
   - 介绍: index.md
+  - 语法:
+    - 管道: syntax/pipeline.md
+    - 条件运算: syntax/conditional.md
+    - 偏函数: syntax/partial.md
+    - 空值合并: syntax/nullish-coalescing.md
+    - 可选链: syntax/optional-chaining.md
 
 markdown_extensions:
   - admonition
@@ -50,3 +56,9 @@ plugins:
       nav_translations:
         en:
           介绍: Introduction
+          语法: Syntax
+          管道: Pipeline
+          条件运算: Conditional
+          偏函数: Partial
+          空值合并: Nullish coalescing
+          可选链: Optional chaining

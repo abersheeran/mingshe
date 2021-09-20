@@ -4,9 +4,9 @@ In addition to the syntax supported by Python itself (currently synchronized to 
 
 - Pipeline: `arg |> func`
 - Conditional: `condition? True_branch: false_branch`
-- Partial function: `square = pow(?, 2)`
-- Null merge: `obj ?? other`
-- Optional chain: `obj?.attr`, `obj?[key]`, `obj?.func()`
+- Partial: `square = pow(?, 2)`
+- Nullish coalescing: `obj ?? other`
+- Optional chaining: `obj?.attr`, `obj?[key]`, `obj?.func()`
 
 ## Editor plugins
 
