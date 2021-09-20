@@ -46,7 +46,7 @@ jobs:
           python script/check.py
       - name: Test with pytest
         run: |
-          pdm run pytest -o log_cli=true -o log_cli_level=DEBUG
+          pdm run pytest tests -o log_cli=true -o log_cli_level=DEBUG
 
   publish:
     needs: tests
