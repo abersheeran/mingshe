@@ -1,35 +1,42 @@
-[tool.poetry]
-authors = ["abersheeran <me@abersheeran.com>"]
-description = ""
-license = "Apache-2.0"
+[project]
+authors = [
+  {name = "abersheeran", email = "me@abersheeran.com"},
+]
+classifiers = ["Programming Language :: Python :: 3"]
+dependencies = []
+description = "A better Python superset language."
+dynamic = ["classifiers"]
+license = {text = "Apache-2.0"}
 name = "mingshe"
 readme = "README.md"
+requires-python = ">=3.9"
 version = "0.7.0"
 
+[project.urls]
 homepage = "https://github.com/abersheeran/mingshe"
 repository = "https://github.com/abersheeran/mingshe"
 
-classifiers = [
-  "Programming Language :: Python :: 3",
+[project.scripts]
+mingshe = "mingshe.commands:main"
+
+[project.optional-dependencies]
+
+[tool.pdm]
+includes = ["mingshe", "aaa_mingshe.pth"]
+
+[tool.pdm.dev-dependencies]
+dev = [
+  "flake8",
 ]
-
-packages = [
-  {include = "mingshe"},
+doc = [
+  "mkdocs[i18n]~=1.2",
+  "mkdocs-material~=7.2",
+  "mkdocs-static-i18n~=0.19",
 ]
-
-include = ["aaa_mingshe.pth"]
-
-[tool.poetry.dependencies]
-python = "^3.9"
-
-[tool.poetry.dev-dependencies]
-flake8 = "*"
-
-pytest = "^5.4.3"
-
-[tool.poetry.scripts]
-mingshe = 'mingshe.commands:main'
+test = [
+  "pytest<6.0.0,>=5.4.3",
+]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+build-backend = "pdm.pep517.api"
+requires = ["pdm-pep517"]
