@@ -25,7 +25,7 @@ print(digit_sum('123456'))
 
 ## Compile to python
 
-Use `mingshe --compile ...` to compile to python.
+Use `mingshe --compile ...` to compile to Python code, and it can be compiled to the specified Python version: `mingshe --compile --python 2.7 ...`.
 
 ## Run short code
 
