@@ -1,11 +1,12 @@
 import ast
 import argparse
+import builtins
 import re
 import sys
 from pathlib import Path
 
 from .__version__ import __version__
-from .core import compile, exec
+from .core import compile
 from .importlib import install_meta
 
 
@@ -38,6 +39,8 @@ def main():
 
     python = tuple(map(int, re.fullmatch(r"(\d+)\.(\d+)", args.python).groups()))
 
+    global_vars = {"__name__": "__main__"}
+
     if args.cmd:
         mingshe_code = args.file
         filename = "<string>"
@@ -48,23 +51,23 @@ def main():
         mingshe_code = _filepath.read_text(encoding="utf8")
         filename = str(_filepath.absolute())
         py_path = _filepath.with_suffix(".py").absolute()
+        global_vars["__file__"] = filename
+
+    ast_obj = compile(
+        mingshe_code,
+        filename=filename,
+        verbose_tokenizer=verbose_tokenizer,
+        verbose_parser=verbose_parser,
+        py_version=python,
+    )
 
     if args.compile:
-        ast_obj = compile(
-            mingshe_code,
-            filename=filename,
-            verbose_tokenizer=verbose_tokenizer,
-            verbose_parser=verbose_parser,
-            py_version=python,
-        )
         py_text = ast.unparse(ast_obj)
         py_path.write_text(py_text, encoding="utf8")
     else:
         sys.path.insert(0, str(Path(".").absolute()))
         install_meta(".she")
-        exec(
-            mingshe_code,
-            filename=filename,
-            verbose_tokenizer=verbose_tokenizer,
-            verbose_parser=verbose_parser,
+        builtins.exec(
+            builtins.compile(ast_obj, filename, "exec"),
+            global_vars,
         )
