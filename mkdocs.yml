@@ -47,6 +47,8 @@ nav:
     - 偏函数: syntax/partial.md
     - 空值合并: syntax/nullish-coalescing.md
     - 可选链: syntax/optional-chaining.md
+  - 内部设计与自定义:
+    - 编写新语言: custom.md
 
 markdown_extensions:
   - admonition
