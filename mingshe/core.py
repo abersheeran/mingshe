@@ -1,24 +1,16 @@
 import ast
-import builtins
 import logging
 import time
 import token
 from io import StringIO
 from tokenize import TokenInfo, generate_tokens
-from typing import Any, Iterable, List, Optional, Tuple
+from typing import Iterable, List, Literal, Optional, Tuple, overload
 
 from pegen.tokenizer import Tokenizer
 
 from .parser import PythonParser
 
 log = logging.getLogger(__name__)
-
-
-def tokenize(s: str) -> Iterable[TokenInfo]:
-    for toknum, tokval, (srow, scol), (erow, ecol), linenum in generate_tokens(
-        StringIO(s).readline
-    ):
-        yield TokenInfo(toknum, tokval, (srow, scol), (erow, ecol), linenum)
 
 
 def merge_operators(tokens: Iterable[TokenInfo]) -> List[TokenInfo]:
@@ -49,19 +41,82 @@ def merge_operators(tokens: Iterable[TokenInfo]) -> List[TokenInfo]:
     return result
 
 
+@overload
 def compile(
-    s: str,
+    source: str,
     filename: str = "<unknown>",
+    symbol: Literal["file"] = "file",
     verbose_tokenizer: bool = False,
     verbose_parser: bool = False,
-    py_version: Optional[Tuple[int, int]] = None
+    py_version: Optional[Tuple[int, int]] = None,
 ) -> ast.Module:
+    ...
+
+
+@overload
+def compile(
+    source: str,
+    filename: str = "<unknown>",
+    symbol: Literal["eval"] = "eval",
+    verbose_tokenizer: bool = False,
+    verbose_parser: bool = False,
+    py_version: Optional[Tuple[int, int]] = None,
+) -> ast.Expression:
+    ...
+
+
+@overload
+def compile(
+    source: str,
+    filename: str = "<unknown>",
+    symbol: Literal["interactive"] = "interactive",
+    verbose_tokenizer: bool = False,
+    verbose_parser: bool = False,
+    py_version: Optional[Tuple[int, int]] = None,
+) -> ast.Interactive:
+    ...
+
+
+@overload
+def compile(
+    source: str,
+    filename: str = "<unknown>",
+    symbol: Literal["func_type"] = "func_type",
+    verbose_tokenizer: bool = False,
+    verbose_parser: bool = False,
+    py_version: Optional[Tuple[int, int]] = None,
+) -> ast.FunctionType:
+    ...
+
+
+@overload
+def compile(
+    source: str,
+    filename: str = "<unknown>",
+    symbol: Literal["fstring"] = "fstring",
+    verbose_tokenizer: bool = False,
+    verbose_parser: bool = False,
+    py_version: Optional[Tuple[int, int]] = None,
+) -> ast.Expr:
+    ...
+
+
+def compile(
+    source,
+    filename="<unknown>",
+    symbol="file",
+    verbose_tokenizer=False,
+    verbose_parser=False,
+    py_version=None,
+):
     start_time = time.time_ns()
-    tokengen = iter(merge_operators(tokenize(s)))
-    tokenizer = Tokenizer(tokengen, verbose=verbose_tokenizer)
-    parser = PythonParser(tokenizer, filename=filename, verbose=verbose_parser, py_version=py_version)
+    token_list = merge_operators(generate_tokens(StringIO(source).readline))
+    tokenizer = Tokenizer(iter(token_list), verbose=verbose_tokenizer)
+    parser = PythonParser(
+        tokenizer, filename=filename, verbose=verbose_parser, py_version=py_version
+    )
     try:
-        return parser.parse("file")
+        return parser.parse(symbol)
     except SyntaxError as syntax_error:
         if parser._exception is None and str(syntax_error) == "invalid syntax":
             raise parser.make_syntax_error("unknown syntax error") from None
@@ -70,16 +125,3 @@ def compile(
     finally:
         end_time = time.time_ns()
         log.debug(f"Compile {filename} took {(end_time - start_time) / 1e6:.2f} ms")
-
-
-def exec(
-    s: str,
-    filename: str = "<unknown>",
-    verbose_tokenizer: bool = False,
-    verbose_parser: bool = False,
-) -> Any:
-    return builtins.exec(
-        builtins.compile(
-            compile(s, filename, verbose_tokenizer, verbose_parser), filename, "exec"
-        )
-    )
