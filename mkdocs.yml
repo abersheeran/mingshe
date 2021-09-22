@@ -11,7 +11,14 @@ theme:
   name: "material"
   language: "zh"
   palette:
-    accent: teal
+    - scheme: default
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
   font:
     code: Fira Code
   icon:
@@ -28,6 +35,8 @@ theme:
       bug: octicons/bug-16
       example: octicons/beaker-16
       quote: octicons/quote-16
+  features:
+    - navigation.sections
 
 nav:
   - 介绍: index.md
