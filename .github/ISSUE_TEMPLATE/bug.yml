@@ -47,7 +47,7 @@ body:
     attributes:
       label: Environment
       description: Describe your environment.
-      placeholder: OS / Python / Index.py version
+      placeholder: OS / Python / mingshe version
     validations:
       required: true
   - type: textarea
