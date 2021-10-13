@@ -30,7 +30,7 @@ class ExtensionMetaFinder(importlib.abc.MetaPathFinder, metaclass=SingletonMetaF
     def __init__(self, suffix: str):
         self.suffix = suffix
 
-    def find_spec(self, module_name: str, path: str, target: str = None):
+    def find_spec(self, module_name: str, path: list[str], target: str = None):
         if path is None:
             paths = [
                 path for path in map(Path, sys.path) if path.exists() and path.is_dir()
@@ -40,25 +40,18 @@ class ExtensionMetaFinder(importlib.abc.MetaPathFinder, metaclass=SingletonMetaF
         for try_path in paths:
             log.debug(f"Finding module {module_name} in {try_path}")
             last_module_name = module_name.rpartition(".")[2]
-            for name in os.listdir(try_path):
-                fullpath = try_path / name
-                if (
-                    fullpath.is_file()
-                    and fullpath.name == last_module_name + self.suffix
-                ):
-                    log.debug(f"Found module '{module_name}' in {fullpath}")
-                    loader = ExtensionModuleLoader(fullpath)
-                    return ModuleSpec(module_name, loader, origin=fullpath)
-                elif (
-                    fullpath.is_dir()
-                    and fullpath.name == last_module_name
-                    and (fullpath / f"__init__{self.suffix}").exists()
-                ):
-                    log.debug(f"Found package '{module_name}' in {fullpath}")
-                    loader = ExtensionPackageLoader(fullpath)
-                    return ModuleSpec(
-                        module_name, loader, origin=fullpath, is_package=True
-                    )
+
+            fullpath = try_path / (last_module_name + self.suffix)
+            if fullpath.exists():
+                log.debug(f"Found module '{module_name}' in {fullpath}")
+                loader = ExtensionModuleLoader(fullpath)
+                return ModuleSpec(module_name, loader, origin=fullpath)
+
+            fullpath = try_path / last_module_name
+            if fullpath.is_dir() and (fullpath / f"__init__{self.suffix}").exists():
+                log.debug(f"Found package '{module_name}' in {fullpath}")
+                loader = ExtensionPackageLoader(fullpath)
+                return ModuleSpec(module_name, loader, origin=fullpath, is_package=True)
 
 
 class ExtensionModuleLoader(importlib.abc.SourceLoader):
