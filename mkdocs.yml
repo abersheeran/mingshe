@@ -1,0 +1,77 @@
+site_name: MíngShé
+site_description: A better Python superset language.
+
+repo_name: MíngShé
+repo_url: https://github.com/abersheeran/mingshe
+edit_uri: "https://github.com/abersheeran/mingshe/tree/master/docs/"
+
+use_directory_urls: true
+
+theme:
+  name: "material"
+  language: "zh"
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+  font:
+    code: Fira Code
+  icon:
+    admonition:
+      note: octicons/tag-16
+      abstract: octicons/checklist-16
+      info: octicons/info-16
+      tip: octicons/squirrel-16
+      success: octicons/check-16
+      question: octicons/question-16
+      warning: octicons/alert-16
+      failure: octicons/x-circle-16
+      danger: octicons/zap-16
+      bug: octicons/bug-16
+      example: octicons/beaker-16
+      quote: octicons/quote-16
+  features:
+    - navigation.sections
+
+nav:
+  - 介绍: index.md
+  - 用法: usage.md
+  - 语法:
+    - 管道: syntax/pipeline.md
+    - 条件运算: syntax/conditional.md
+    - 偏函数: syntax/partial.md
+    - 空值合并: syntax/nullish-coalescing.md
+    - 可选链: syntax/optional-chaining.md
+  - 内部设计与自定义:
+    - 编写新语言: custom.md
+
+markdown_extensions:
+  - admonition
+  - extra
+  - pymdownx.highlight:
+      linenums: true
+  - pymdownx.superfences
+  - pymdownx.details
+
+plugins:
+  - search
+  - i18n:
+      default_language: zh
+      languages:
+        zh: 中文
+        en: English
+      nav_translations:
+        en:
+          介绍: Introduction
+          用法: Usage
+          语法: Syntax
+          管道: Pipeline
+          条件运算: Conditional
+          偏函数: Partial
+          空值合并: Nullish coalescing
+          可选链: Optional chaining

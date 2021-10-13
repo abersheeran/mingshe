@@ -52,7 +52,78 @@ import mingshe.core
         (
             "a ? (b ? d : e) : c",
             "(d if b else e) if a else c",
-        )
+        ),
+        # 偏函数
+        (
+            "f(?)",
+            "(lambda f: (lambda _0: f(_0)))(f)",
+        ),
+        (
+            "pow(?, 2)",
+            "(lambda f: lambda _0: f(_0, 2))(pow)",
+        ),
+        (
+            "f(a, b=?)",
+            "(lambda _p_0, f: lambda _0: f(_p_0, b=_0))(a, f)",
+        ),
+        (
+            "f(?, b=0)",
+            "(lambda f: lambda _0: f(_0, b=0))(f)",
+        ),
+        (
+            "f(?, b=t0)",
+            "(lambda f, b: lambda _0: f(_0, b=b))(f, b=t0)",
+        ),
+        (
+            "f(1, *?)",
+            "(lambda f: lambda _0: f(1, *_0))(f)",
+        ),
+        (
+            "f(a, **?)",
+            "(lambda _p_0, f: lambda _0: f(_p_0, **_0))(a, f)",
+        ),
+        (
+            "f(a, *?, **?)",
+            "(lambda _p_0, f: lambda _0, _1: f(_p_0, *_0, **_1))(a, f)",
+        ),
+        (
+            "json.dumps(?, ensure_ascii=False)",
+            "(lambda f: lambda _0: f(_0, ensure_ascii=False))(json.dumps)",
+        ),
+        # 空值合并
+        (
+            "a ?? b",
+            "a if a is not None else b",
+        ),
+        (
+            "a ?? b ?? c",
+            "_1 if (_1 := (a if a is not None else b)) is not None else c",
+        ),
+        # 可选链
+        (
+            "a?.b",
+            "None if a is None else a.b",
+        ),
+        (
+            "a?[b]",
+            "None if a is None else a[b]",
+        ),
+        (
+            "a?.b()",
+            "None if a is None else a.b()",
+        ),
+        (
+            "a?.b?.c",
+            "None if (_ := (None if a is None else a.b)) is None else _.c"
+        ),
+        (
+            "a?[b]?[c]",
+            "None if (_ := (None if a is None else a[b])) is None else _[c]"
+        ),
+        (
+            "a?.b()?.c()",
+            "None if (_ := (None if a is None else a.b())) is None else _.c()"
+        ),
     ],
 )
 def test_right_example(raw, result):
