@@ -63,6 +63,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "iniconfig"
+version = "1.1.1"
+summary = "iniconfig: brain-dead simple config-ini parsing"
+
+[[package]]
 name = "Jinja2"
 version = "3.0.2"
 requires_python = ">=3.6"
@@ -155,17 +160,11 @@ dependencies = [
     "ghp-import>=1.0",
     "importlib-metadata>=3.10",
     "mergedeep>=1.3.4",
-    "mkdocs~=1.2",
+    "mkdocs==1.2.3",
     "packaging>=20.5",
     "pyyaml-env-tag>=0.1",
     "watchdog>=2.0",
 ]
-
-[[package]]
-name = "more-itertools"
-version = "8.10.0"
-requires_python = ">=3.5"
-summary = "More routines for operating on iterables, beyond itertools"
 
 [[package]]
 name = "packaging"
@@ -223,18 +222,18 @@ summary = "Python parsing module"
 
 [[package]]
 name = "pytest"
-version = "5.4.3"
-requires_python = ">=3.5"
+version = "6.2.5"
+requires_python = ">=3.6"
 summary = "pytest: simple powerful testing with Python"
 dependencies = [
     "atomicwrites>=1.0; sys_platform == \"win32\"",
-    "attrs>=17.4.0",
+    "attrs>=19.2.0",
     "colorama; sys_platform == \"win32\"",
-    "more-itertools>=4.0.0",
+    "iniconfig",
     "packaging",
-    "pluggy<1.0,>=0.12",
-    "py>=1.5.0",
-    "wcwidth",
+    "pluggy<2.0,>=0.12",
+    "py>=1.8.2",
+    "toml",
 ]
 
 [[package]]
@@ -273,15 +272,16 @@ requires_python = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 summary = "Python 2 and 3 compatibility utilities"
 
 [[package]]
+name = "toml"
+version = "0.10.2"
+requires_python = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
+summary = "Python Library for Tom's Obvious, Minimal Language"
+
+[[package]]
 name = "watchdog"
 version = "2.1.6"
 requires_python = ">=3.6"
 summary = "Filesystem events monitoring"
-
-[[package]]
-name = "wcwidth"
-version = "0.2.5"
-summary = "Measures the displayed width of unicode strings in a terminal"
 
 [[package]]
 name = "zipp"
@@ -291,7 +291,7 @@ summary = "Backport of pathlib-compatible object wrapper for zip files"
 
 [metadata]
 lock_version = "3.1"
-content_hash = "sha256:6e6f767b70dea1caa5fb6e7af37038211416c461a0a3058746b2a93c1b3f03c0"
+content_hash = "sha256:943da04aaf8d05a6973a7328fb5f1e80de59fb7428d15061a06e7e7519010d71"
 
 [metadata.files]
 "atomicwrites 1.4.0" = [
@@ -325,6 +325,10 @@ content_hash = "sha256:6e6f767b70dea1caa5fb6e7af37038211416c461a0a3058746b2a93c1
 "importlib-metadata 4.8.1" = [
     {file = "importlib_metadata-4.8.1-py3-none-any.whl", hash = "sha256:b618b6d2d5ffa2f16add5697cf57a46c76a56229b0ed1c438322e4e95645bd15"},
     {file = "importlib_metadata-4.8.1.tar.gz", hash = "sha256:f284b3e11256ad1e5d03ab86bb2ccd6f5339688ff17a4d797a0fe7df326f23b1"},
+]
+"iniconfig 1.1.1" = [
+    {file = "iniconfig-1.1.1-py2.py3-none-any.whl", hash = "sha256:011e24c64b7f47f6ebd835bb12a743f2fbe9a26d4cecaa7f53bc4f35ee9da8b3"},
+    {file = "iniconfig-1.1.1.tar.gz", hash = "sha256:bc3af051d7d14b2ee5ef9969666def0cd1a000e121eaea580d4a313df4b37f32"},
 ]
 "jinja2 3.0.2" = [
     {file = "Jinja2-3.0.2-py3-none-any.whl", hash = "sha256:8569982d3f0889eed11dd620c706d39b60c36d6d25843961f33f77fb6bc6b20c"},
@@ -413,10 +417,6 @@ content_hash = "sha256:6e6f767b70dea1caa5fb6e7af37038211416c461a0a3058746b2a93c1
 "mkdocs-static-i18n 0.21" = [
     {file = "mkdocs-static-i18n-0.21.tar.gz", hash = "sha256:f4851fc5e00906e2a6306b872f18f2c7f74d25cc237dfb1253ca9a7040690e2a"},
 ]
-"more-itertools 8.10.0" = [
-    {file = "more_itertools-8.10.0-py3-none-any.whl", hash = "sha256:56ddac45541718ba332db05f464bebfb0768110111affd27f66e0051f276fa43"},
-    {file = "more-itertools-8.10.0.tar.gz", hash = "sha256:1debcabeb1df793814859d64a81ad7cb10504c24349368ccf214c664c474f41f"},
-]
 "packaging 21.0" = [
     {file = "packaging-21.0-py3-none-any.whl", hash = "sha256:c86254f9220d55e31cc94d69bade760f0847da8000def4dfe1c6b872fd14ff14"},
     {file = "packaging-21.0.tar.gz", hash = "sha256:7dc96269f53a4ccec5c0670940a4281106dd0bb343f47b7471f779df49c2fbe7"},
@@ -449,9 +449,9 @@ content_hash = "sha256:6e6f767b70dea1caa5fb6e7af37038211416c461a0a3058746b2a93c1
     {file = "pyparsing-2.4.7-py2.py3-none-any.whl", hash = "sha256:ef9d7589ef3c200abe66653d3f1ab1033c3c419ae9b9bdb1240a85b024efc88b"},
     {file = "pyparsing-2.4.7.tar.gz", hash = "sha256:c203ec8783bf771a155b207279b9bccb8dea02d8f0c9e5f8ead507bc3246ecc1"},
 ]
-"pytest 5.4.3" = [
-    {file = "pytest-5.4.3-py3-none-any.whl", hash = "sha256:5c0db86b698e8f170ba4582a492248919255fcd4c79b1ee64ace34301fb589a1"},
-    {file = "pytest-5.4.3.tar.gz", hash = "sha256:7979331bfcba207414f5e1263b5a0f8f521d0f457318836a7355531ed1a4c7d8"},
+"pytest 6.2.5" = [
+    {file = "pytest-6.2.5-py3-none-any.whl", hash = "sha256:7310f8d27bc79ced999e760ca304d69f6ba6c6649c0b60fb0e04a4a77cacc134"},
+    {file = "pytest-6.2.5.tar.gz", hash = "sha256:131b36680866a76e6781d13f101efb86cf674ebb9762eb70d3082b6f29889e89"},
 ]
 "python-dateutil 2.8.2" = [
     {file = "python_dateutil-2.8.2-py2.py3-none-any.whl", hash = "sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9"},
@@ -500,6 +500,10 @@ content_hash = "sha256:6e6f767b70dea1caa5fb6e7af37038211416c461a0a3058746b2a93c1
     {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
     {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},
 ]
+"toml 0.10.2" = [
+    {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},
+    {file = "toml-0.10.2.tar.gz", hash = "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"},
+]
 "watchdog 2.1.6" = [
     {file = "watchdog-2.1.6-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:9693f35162dc6208d10b10ddf0458cc09ad70c30ba689d9206e02cd836ce28a3"},
     {file = "watchdog-2.1.6-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:aba5c812f8ee8a3ff3be51887ca2d55fb8e268439ed44110d3846e4229eb0e8b"},
@@ -524,10 +528,6 @@ content_hash = "sha256:6e6f767b70dea1caa5fb6e7af37038211416c461a0a3058746b2a93c1
     {file = "watchdog-2.1.6-py3-none-win_amd64.whl", hash = "sha256:bd9ba4f332cf57b2c1f698be0728c020399ef3040577cde2939f2e045b39c1e5"},
     {file = "watchdog-2.1.6-py3-none-win_ia64.whl", hash = "sha256:a0f1c7edf116a12f7245be06120b1852275f9506a7d90227648b250755a03923"},
     {file = "watchdog-2.1.6.tar.gz", hash = "sha256:a36e75df6c767cbf46f61a91c70b3ba71811dfa0aca4a324d9407a06a8b7a2e7"},
-]
-"wcwidth 0.2.5" = [
-    {file = "wcwidth-0.2.5-py2.py3-none-any.whl", hash = "sha256:beb4802a9cebb9144e99086eff703a642a13d6a0052920003a230f3294bbe784"},
-    {file = "wcwidth-0.2.5.tar.gz", hash = "sha256:c4d647b99872929fdb7bdcaa4fbe7f01413ed3d98077df798530e5b04f116c83"},
 ]
 "zipp 3.6.0" = [
     {file = "zipp-3.6.0-py3-none-any.whl", hash = "sha256:9fe5ea21568a0a70e50f273397638d39b03353731e6cbbb3fd8502a33fec40bc"},
