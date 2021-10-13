@@ -1,6 +1,7 @@
 import ast
 import argparse
 import builtins
+import logging
 import re
 import sys
 from pathlib import Path
@@ -37,6 +38,10 @@ def main():
     verbose_tokenizer = verbose >= 3
     verbose_parser = verbose == 2 or verbose >= 4
 
+    if verbose:
+        logging.getLogger("mingshe").setLevel(logging.DEBUG)
+        logging.basicConfig()
+
     python = tuple(map(int, re.fullmatch(r"(\d+)\.(\d+)", args.python).groups()))
 
     global_vars = {"__name__": "__main__"}
@@ -67,7 +72,4 @@ def main():
     else:
         sys.path.insert(0, str(Path(".").absolute()))
         install_meta(".she")
-        builtins.exec(
-            builtins.compile(ast_obj, filename, "exec"),
-            global_vars,
-        )
+        builtins.exec(builtins.compile(ast_obj, filename, "exec"), global_vars)
