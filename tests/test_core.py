@@ -60,7 +60,7 @@ import mingshe.core
         ),
         (
             "pow(?, 2)",
-            "(lambda pow: lambda _0: pow(_0, 2))(pow)",
+            "(lambda f: lambda _0: f(_0, 2))(pow)",
         ),
         (
             "f(a, b=?)",
@@ -85,6 +85,10 @@ import mingshe.core
         (
             "f(a, *?, **?)",
             "(lambda _p_0, f: lambda _0, _1: f(_p_0, *_0, **_1))(a, f)",
+        ),
+        (
+            "json.dumps(?, ensure_ascii=False)",
+            "(lambda f: lambda _0: f(_0, ensure_ascii=False))(json.dumps)",
         ),
         # 空值合并
         (

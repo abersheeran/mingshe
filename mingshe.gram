@@ -289,7 +289,7 @@ class Parser(Parser):
                     **locations,
                 )
 
-        result = ast.Call(func=func, args=args, keywords=kwargs, **locations)
+        result = ast.Call(func=ast.Name("f", ctx=Load, **locations), args=args, keywords=kwargs, **locations)
         if q_count > 0:
             lambda_body = ast.Lambda(
                 args=ast.arguments(
@@ -304,7 +304,7 @@ class Parser(Parser):
                 func=ast.Lambda(
                     args=ast.arguments(
                         args=[ast.arg(arg=f"_p_{i}", **locations) for i in range(len(bind_args))]
-                             + [ast.arg(arg=func.id, **locations)]
+                             + [ast.arg(arg="f", **locations)]
                              + [ast.arg(arg=bind_kwargs[i].arg, **locations) for i in range(len(bind_kwargs))],
                         posonlyargs=[], kwonlyargs=[], kw_defaults=[], defaults=[], vararg=None, kwarg=None,
                         **locations,

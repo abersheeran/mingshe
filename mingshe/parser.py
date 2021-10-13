@@ -296,7 +296,7 @@ class Parser(Parser):
                     **locations,
                 )
 
-        result = ast.Call(func=func, args=args, keywords=kwargs, **locations)
+        result = ast.Call(func=ast.Name("f", ctx=Load, **locations), args=args, keywords=kwargs, **locations)
         if q_count > 0:
             lambda_body = ast.Lambda(
                 args=ast.arguments(
@@ -311,7 +311,7 @@ class Parser(Parser):
                 func=ast.Lambda(
                     args=ast.arguments(
                         args=[ast.arg(arg=f"_p_{i}", **locations) for i in range(len(bind_args))]
-                             + [ast.arg(arg=func.id, **locations)]
+                             + [ast.arg(arg="f", **locations)]
                              + [ast.arg(arg=bind_kwargs[i].arg, **locations) for i in range(len(bind_kwargs))],
                         posonlyargs=[], kwonlyargs=[], kw_defaults=[], defaults=[], vararg=None, kwarg=None,
                         **locations,
@@ -10082,7 +10082,7 @@ class PythonParser(Parser):
         self._reset(mark)
         return None
 
-    KEYWORDS = ('pass', 'class', 'def', 'return', 'nonlocal', 'if', 'is', 'not', 'in', 'and', 'continue', 'del', 'global', 'raise', 'else', 'from', 'True', 'False', 'break', 'try', 'while', 'async', 'None', 'await', 'yield', 'lambda', 'elif', 'except', 'import', 'with', 'or', 'finally', 'for', 'assert', 'as')
+    KEYWORDS = ('False', 'None', 'True', 'and', 'as', 'assert', 'async', 'await', 'break', 'class', 'continue', 'def', 'del', 'elif', 'else', 'except', 'finally', 'for', 'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'nonlocal', 'not', 'or', 'pass', 'raise', 'return', 'try', 'while', 'with', 'yield')
     SOFT_KEYWORDS = ('_', 'case', 'match')
 
 
