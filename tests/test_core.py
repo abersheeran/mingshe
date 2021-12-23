@@ -124,6 +124,23 @@ import mingshe.core
             "a?.b()?.c()",
             "None if (_ := (None if a is None else a.b())) is None else _.c()"
         ),
+        # 字典展开
+        (
+            "{ x } = {'x': '1'}",
+            "(x,) = (lambda **kwargs: (kwargs.get('x'),))(**{'x': '1'})",
+        ),
+        (
+            "{ x, y } = {'x': '1'}",
+            "(x, y) = (lambda **kwargs: (kwargs.get('x'), kwargs.get('y')))(**{'x': '1'})",
+        ),
+        (
+            "{ x, y } = name",
+            "(x, y) = (lambda **kwargs: (kwargs.get('x'), kwargs.get('y')))(**name)",
+        ),
+        (
+            "{ x, y } = d0 + d1",
+            "(x, y) = (lambda **kwargs: (kwargs.get('x'), kwargs.get('y')))(**(d0 + d1))",
+        )
     ],
 )
 def test_right_example(raw, result):

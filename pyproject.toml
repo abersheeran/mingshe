@@ -5,7 +5,6 @@ authors = [
 classifiers = ["Programming Language :: Python :: 3"]
 dependencies = []
 description = "A better Python superset language."
-dynamic = ["classifiers"]
 license = {text = "Apache-2.0"}
 name = "mingshe"
 readme = "README.md"

@@ -7,6 +7,7 @@ In addition to the syntax supported by Python itself (currently synchronized to 
 - Partial: `square = pow(?, 2)`
 - Nullish coalescing: `obj ?? other`
 - Optional chaining: `obj?.attr`, `obj?[key]`, `obj?.func()`
+- Unpack mapping：`{ key } = one_dict`
 
 ## Editor plugins
 

@@ -348,6 +348,44 @@ class Parser(Parser):
         result._is_optional_chaining = True
         return result
 
+    def unpack_mapping(self, left, right, **locations):
+        return ast.Assign(
+            targets=[
+                ast.Tuple(
+                    elts=[
+                        ast.Name(id=token_info.string, ctx=Store, **locations)
+                        for token_info in left],
+                    ctx=Store, **locations)
+            ],
+            value=ast.Call(
+                func=ast.Lambda(
+                    args=ast.arguments(
+                        kwarg=ast.arg(arg="kwargs", **locations),
+                        args=[], posonlyargs=[], kwonlyargs=[], kw_defaults=[], defaults=[], vararg=None,
+                        **locations,
+                    ),
+                    body=ast.Tuple(elts=[
+                            ast.Call(
+                                func=ast.Attribute(
+                                    value=ast.Name(id='kwargs', ctx=Load, **locations),
+                                    attr='get',
+                                    ctx=Load,
+                                    **locations
+                                ),
+                                args=[ast.Constant(value=token_info.string, **locations)],
+                                keywords=[],
+                                **locations,
+                            )
+                            for token_info in left], ctx=Load, **locations),
+                    **locations,
+                ),
+                args=[],
+                keywords=[ast.keyword(value=right, **locations)],
+                **locations,
+            ),
+            **locations,
+        )
+
     def make_arguments(self,
         pos_only: Optional[List[Tuple[ast.arg, None]]],
         pos_only_with_default: List[Tuple[ast.arg, Any]],
@@ -586,6 +624,7 @@ assignment:
             )
         )
      }
+    | '{' a=','.NAME+ '}' '=' b=expression { self.unpack_mapping(a, b, LOCATIONS) }
     | a=(z=star_targets '=' { z })+ b=(yield_expr | star_expressions) !'=' tc=[TYPE_COMMENT] {
          ast.Assign(targets=a, value=b, type_comment=tc, LOCATIONS)
      }

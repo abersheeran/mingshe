@@ -7,6 +7,7 @@
 - 偏函数：`square = pow(?, 2)`
 - 空值合并：`obj ?? other`
 - 可选链：`obj?.attr`、`obj?[key]`、`obj?.func()`
+- 字典解构赋值：`{ key } = one_dict`
 
 ## 编辑器插件
 
