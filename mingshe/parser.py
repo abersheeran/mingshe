@@ -326,17 +326,49 @@ class Parser(Parser):
         return result
 
     def make_nullish_coalescing(self, array, **locations):
-        result = array[0]
-        for i, item in enumerate(array[1:]):
-            if i == 0:
-                if_not_null = ast.Compare(left=result, ops=[ast.IsNot()], comparators=[ast.Constant(value=None, **locations)], **locations)
-                result = ast.IfExp(body=result, test=if_not_null, orelse=item, **locations)
-            else:
-                self.check_version((3, 8), "Chained use of ??", None)
-                temporary = ast.NamedExpr(target=ast.Name(id=f'_{i}', ctx=Store, **locations), value=result, **locations)
-                if_not_null = ast.Compare(left=temporary, ops=[ast.IsNot()], comparators=[ast.Constant(value=None, **locations)], **locations)
-                result = ast.IfExp(body=ast.Name(id=f'_{i}', ctx=Load, **locations), test=if_not_null, orelse=item, **locations)
-        return result
+        length = len(array)
+        body = ast.Call(func=ast.Name(id="arg0", ctx=Load, **locations), args=[], keywords=[], **locations)
+        for i in range(1, length):
+            temporary = ast.NamedExpr(
+                target=ast.Name(id=f'_{i}', ctx=Store, **locations),
+                value=body, **locations
+            )
+            if_not_null = ast.Compare(
+                left=temporary,
+                ops=[ast.IsNot()],
+                comparators=[ast.Constant(value=None, **locations)],
+                **locations
+            )
+            body = ast.IfExp(
+                body=ast.Name(id=f'_{i}', ctx=Load, **locations),
+                test=if_not_null,
+                orelse=ast.Call(func=ast.Name(id=f"arg{i}", ctx=Load, **locations), args=[], keywords=[], **locations),
+                **locations
+            )
+
+        return ast.Call(
+            func=ast.Lambda(
+                args=ast.arguments(
+                    args=[ast.arg(arg=f"arg{i}", **locations) for i in range(length)],
+                    posonlyargs=[], kwonlyargs=[], defaults=[], vararg=None, kw_defaults=[], kwarg=None,
+                    **locations,
+                ),
+                body=body,
+                **locations,
+            ),
+            args=[
+                ast.Lambda(
+                    args=ast.arguments(
+                        args=[], posonlyargs=[], kwonlyargs=[], defaults=[], vararg=None, kw_defaults=[], kwarg=None,
+                        **locations,
+                    ),
+                    body=item,
+                    **locations,
+                )
+                for item in array
+            ],
+            keywords=[], **locations
+        )
 
     def make_optional_chaining(self, left, node, **locations):
         if isinstance(left, ast.IfExp) and getattr(left, "_is_optional_chaining", False):
@@ -3415,7 +3447,7 @@ class PythonParser(Parser):
         ):
             tok = self._tokenizer.get_last_non_whitespace_token()
             end_lineno, end_col_offset = tok.end
-            return self . make_nullish_coalescing ( [a] + b , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset )
+            return self . check_version ( ( 3 , 8 ) , "The '??' operator is" , self . make_nullish_coalescing ( [a] + b , lineno=start_lineno, col_offset=start_col_offset, end_lineno=end_lineno, end_col_offset=end_col_offset ) )
         self._reset(mark)
         if (
             (conjunction := self.conjunction())
