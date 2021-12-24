@@ -93,11 +93,11 @@ import mingshe.core
         # 空值合并
         (
             "a ?? b",
-            "a if a is not None else b",
+            "(lambda arg0, arg1: _1 if (_1 := arg0()) is not None else arg1())(lambda : a, lambda : b)",
         ),
         (
             "a ?? b ?? c",
-            "_1 if (_1 := (a if a is not None else b)) is not None else c",
+            "(lambda arg0, arg1, arg2: _2 if (_2 := (_1 if (_1 := arg0()) is not None else arg1())) is not None else arg2())(lambda : a, lambda : b, lambda : c)",
         ),
         # 可选链
         (
