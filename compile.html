@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>MíngShé Compiler</title>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.18.1/full/pyodide.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/purecss@2.0.6/build/pure-min.css"
+        integrity="sha384-Uu6IeWbM+gzNVXJcM9XV3SohHtmWE+3VGi496jvgX1jyvDTXfdK+rfZc8C1Aehk5" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://unpkg.com/purecss@2.0.6/build/base-min.css">
+    <link rel="stylesheet" href="https://unpkg.com/purecss@2.0.6/build/grids-min.css">
+    <link rel="stylesheet" href="https://unpkg.com/purecss@2.0.6/build/grids-responsive-min.css">
+</head>
+
+<body>
+    <div class="pure-g">
+        <textarea class="pure-u-md-1-2" id="code" value="" onkeydown="onKeyDown(event)"
+            oninput="onInput(event)"></textarea>
+        <textarea class="pure-u-md-1-2" id="output" rows="6" disabled></textarea>
+    </div>
+
+    <script>
+        const output = document.getElementById("output");
+        const code = document.getElementById("code");
+
+        output.value = "Initializing...\n";
+        // init Pyodide
+        async function main() {
+            let pyodide = await loadPyodide({
+                indexURL: "https://cdn.jsdelivr.net/pyodide/v0.18.1/full/",
+            });
+            await pyodide.loadPackage("micropip");
+            await pyodide.runPythonAsync(`
+                import micropip
+                await micropip.install('mingshe')
+                import mingshe.core
+                import ast
+                convert = lambda code: ast.unparse(mingshe.core.compile(code))
+            `);
+            output.value = "Ready!\nType Ctrl+Enter to compile code.\n";
+            return pyodide;
+        }
+        let pyodideReadyPromise = main();
+
+        async function evaluatePython() {
+            let pyodide = await pyodideReadyPromise;
+            try {
+                output.value = pyodide.runPython(`convert('''${code.value}''')`);
+            } catch (err) {
+                output.value = err
+            }
+        }
+
+        function onKeyDown(event) {
+            if (event.keyCode == 13 && event.ctrlKey) {
+                evaluatePython();
+            }
+        }
+
+        function onInput(event) {
+            (function autoHeight(element) {
+                element.style.height = 'auto';
+                element.scrollTop = 0; //防抖动
+                element.style.height = element.scrollHeight + 2 + 'px';
+            })(event.target);
+        }
+    </script>
+    <style>
+        #code,
+        #output {
+            font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace !important;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            outline: none;
+            min-height: 100vh;
+            text-align: start;
+            overflow-x: scroll;
+            word-break: keep-all;
+            white-space: nowrap;
+            resize: vertical;
+        }
+    </style>
+</body>
+
+</html>
