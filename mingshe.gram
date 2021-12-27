@@ -250,8 +250,8 @@ class Parser(Parser):
         **locations,
     ) -> Union[ast.Lambda, ast.Call]:
         """"Build a partial function"""
-        args = arguments[0] if arguments else []
-        kwargs = arguments[1] if arguments else []
+        args = list(arguments[0] if arguments else [])
+        kwargs = list(arguments[1] if arguments else [])
         q_count = 0
         bind_args = []
         bind_kwargs = []
