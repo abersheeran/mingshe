@@ -9,6 +9,7 @@ from typing import Any, Optional
 
 from pegen.parser import memoize, memoize_left_rec, logger, Parser
 
+import copy
 import io
 import itertools
 import os
@@ -371,19 +372,27 @@ class Parser(Parser):
         )
 
     def make_optional_chaining(self, left, node, **locations):
-        if isinstance(left, ast.IfExp) and getattr(left, "_is_optional_chaining", False):
-            self.check_version((3, 8), "Chained use of ?.", None)
-            temporary = ast.NamedExpr(target=ast.Name(id='_', ctx=Store, **locations), value=left, **locations)
-            if isinstance(node, ast.Call):
-                node.func.value = ast.Name(id='_', ctx=Load, **locations)
-            elif isinstance(node, ast.Attribute):
-                node.value = ast.Name(id='_', ctx=Load, **locations)
-            elif isinstance(node, ast.Subscript):
-                node.value = ast.Name(id='_', ctx=Load, **locations)
-        else:
-            temporary = left
+        if isinstance(left, ast.Call) and getattr(left, "_is_optional_chaining", False):
+            left = left.func.body
+        temporary = ast.NamedExpr(target=ast.Name(id='_', ctx=Store, **locations), value=left, **locations)
+        node = copy.deepcopy(node)
+        if isinstance(node, ast.Call):
+            node.func.value = ast.Name(id='_', ctx=Load, **locations)
+        elif isinstance(node, ast.Attribute):
+            node.value = ast.Name(id='_', ctx=Load, **locations)
+        elif isinstance(node, ast.Subscript):
+            node.value = ast.Name(id='_', ctx=Load, **locations)
         if_null = ast.Compare(left=temporary, ops=[ast.Is()], comparators=[ast.Constant(value=None, **locations)], **locations)
-        result = ast.IfExp(body=ast.Constant(value=None, **locations), test=if_null, orelse=node, **locations)
+        body = ast.IfExp(body=ast.Constant(value=None, **locations), test=if_null, orelse=node, **locations)
+        result = ast.Call(
+            func=ast.Lambda(
+                args=ast.arguments(args=[], posonlyargs=[], kwonlyargs=[],
+                    defaults=[], vararg=None, kw_defaults=[], kwarg=None,**locations,
+                ),
+                body=body, **locations,
+            ),
+            args=[], keywords=[], **locations
+        )
         result._is_optional_chaining = True
         return result
 

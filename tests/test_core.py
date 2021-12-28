@@ -102,27 +102,27 @@ import mingshe.core
         # 可选链
         (
             "a?.b",
-            "None if a is None else a.b",
+            "(lambda : None if (_ := a) is None else _.b)()",
         ),
         (
             "a?[b]",
-            "None if a is None else a[b]",
+            "(lambda : None if (_ := a) is None else _[b])()",
         ),
         (
             "a?.b()",
-            "None if a is None else a.b()",
+            "(lambda : None if (_ := a) is None else _.b())()",
         ),
         (
             "a?.b?.c",
-            "None if (_ := (None if a is None else a.b)) is None else _.c"
+            "(lambda : None if (_ := (None if (_ := a) is None else _.b)) is None else _.c)()"
         ),
         (
             "a?[b]?[c]",
-            "None if (_ := (None if a is None else a[b])) is None else _[c]"
+            "(lambda : None if (_ := (None if (_ := a) is None else _[b])) is None else _[c])()"
         ),
         (
             "a?.b()?.c()",
-            "None if (_ := (None if a is None else a.b())) is None else _.c()"
+            "(lambda : None if (_ := (None if (_ := a) is None else _.b())) is None else _.c())()"
         ),
         # 字典展开
         (
