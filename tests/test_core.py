@@ -124,6 +124,10 @@ import mingshe.core
             "a?.b()?.c()",
             "(lambda : None if (_ := (None if (_ := a) is None else _.b())) is None else _.c())()"
         ),
+        (
+            "(p |> f)?[b]()",
+            "(lambda : None if (_ := f(p)) is None else _[b])()()",
+        ),
         # 字典展开
         (
             "{ x } = {'x': '1'}",
@@ -154,6 +158,9 @@ def test_right_example(raw, result):
     [
         "1 |> ",
         "a ? b",
+        "a or b ?? c",
+        "a ?? b or c",
+        "a?.[b]",
     ]
 )
 def test_wrong_example(string):
