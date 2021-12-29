@@ -13,7 +13,7 @@ from .importlib import install_meta
 
 def main():
     argparser = argparse.ArgumentParser(description=f"MíngShé {__version__}")
-    argparser.add_argument("file", help="The .she file")
+    argparser.add_argument("file", help="The .she file", nargs="?")
     argparser.add_argument(
         "--python",
         help="Python version. e.g. 3.7",
@@ -46,17 +46,21 @@ def main():
 
     global_vars = {"__name__": "__main__"}
 
-    if args.cmd:
+    write_to_py = lambda x: sys.stdout.write(x)
+
+    if not args.cmd:
+        if args.file is None:
+            mingshe_code = sys.stdin.readable() and sys.stdin.read()
+            filename = "<stdin>"
+        else:
+            _filepath = Path(args.file)
+            mingshe_code = _filepath.read_text(encoding="utf8")
+            filename = _filepath.absolute().__str__()
+            write_to_py = _filepath.with_suffix(".py").absolute().write_text
+        global_vars["__file__"] = filename
+    else:
         mingshe_code = args.file
         filename = "<string>"
-        py_path = sys.stdout
-        py_path.write_text = lambda x, encoding: py_path.write(x)
-    else:
-        _filepath = Path(args.file)
-        mingshe_code = _filepath.read_text(encoding="utf8")
-        filename = str(_filepath.absolute())
-        py_path = _filepath.with_suffix(".py").absolute()
-        global_vars["__file__"] = filename
 
     ast_obj = compile(
         mingshe_code,
@@ -68,8 +72,8 @@ def main():
 
     if args.compile:
         py_text = ast.unparse(ast_obj)
-        py_path.write_text(py_text, encoding="utf8")
+        write_to_py(py_text, encoding="utf8")
     else:
         sys.path.insert(0, str(Path(".").absolute()))
-        install_meta(".she")
+        install_meta(".she")  # 无论 .pth 是否加载均可解析 .she 文件
         builtins.exec(builtins.compile(ast_obj, filename, "exec"), global_vars)
