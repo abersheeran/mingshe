@@ -9,40 +9,11 @@ A better [Python](https://www.python.org/) superset language. Use [Pegen](https:
 
 ## Install
 
+Need Python3.9+
+
 ```
 pip install mingshe
 ```
-
-## Usage
-
-### As a script
-
-Write the following code to `hello.she`, and then run `mingshe ./hello.she`.
-
-```mingshe
-"hello world" |> print
-```
-
-### As a module
-
-Just like use a python module, you can use a mingshe module.
-
-```python
-# lib.she
-def digit_sum(s: str) -> int:
-    return s |> map(int, ?) |> sum
-```
-
-```python
-# main.py
-from lib import digit_sum
-
-print(digit_sum('123456'))
-```
-
-### Compile to python
-
-Use `mingshe --compile ...` to compile to Python code, and it can be compiled to the specified Python version: `mingshe --compile --python 2.7 ...`.
 
 ## Change log
 
