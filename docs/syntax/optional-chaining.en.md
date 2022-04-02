@@ -24,3 +24,7 @@ try:
 finally:
      sock?.close()
 ```
+
+## Reference
+
+- https://peps.python.org/pep-0505/

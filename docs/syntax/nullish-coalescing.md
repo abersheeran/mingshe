@@ -19,3 +19,7 @@ a or b ?? c    # 语法错误
 (a or b) ?? c  # 正确
 a or (b ?? c)  # 正确
 ```
+
+## 参考
+
+- https://peps.python.org/pep-0505/

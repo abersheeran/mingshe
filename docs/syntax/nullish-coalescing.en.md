@@ -19,3 +19,7 @@ a or b ?? c # syntax error
 (a or b) ?? c # correct
 a or (b ?? c) # correct
 ```
+
+## Reference
+
+- https://peps.python.org/pep-0505/
