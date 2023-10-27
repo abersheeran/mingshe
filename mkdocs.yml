@@ -62,20 +62,24 @@ markdown_extensions:
 plugins:
   - search
   - i18n:
-      default_language: zh
+      docs_structure: suffix
       languages:
-        zh: 中文
-        en: English
-      nav_translations:
-        en:
-          介绍: Introduction
-          用法: Usage
-          语法: Syntax
-          管道: Pipeline
-          条件运算: Conditional
-          偏函数: Partial
-          空值合并: Nullish coalescing
-          可选链: Optional chaining
-          字典解构赋值: Unpack mapping
-          内部设计与自定义: Internal Design and Customization
-          编写新语言: Create own language
+        - locale: en
+          default: true
+          name: English
+          build: true
+        - locale: zh
+          name: 简体中文
+          build: true
+          nav_translations:
+            介绍: Introduction
+            用法: Usage
+            语法: Syntax
+            管道: Pipeline
+            条件运算: Conditional
+            偏函数: Partial
+            空值合并: Nullish coalescing
+            可选链: Optional chaining
+            字典解构赋值: Unpack mapping
+            内部设计与自定义: Internal Design and Customization
+            编写新语言: Create own language
